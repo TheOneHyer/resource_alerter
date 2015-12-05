@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='resource_alerter',
       version='0.0.0a1',
@@ -24,10 +24,11 @@ setup(name='resource_alerter',
       author='Alex Hyer',
       author_email='theonehyer@gmail.com',
       license='GPLv3',
-      packages=[
-          'resource_alerter'
-      ],
+      packages=find_packages(),
       include_package_data=True,
-      zip_safe=False
-      # install_requires=[]
+      zip_safe=False,
+      install_requires=[
+          'python-daemon',
+          'pyyaml'
+      ]
       )
