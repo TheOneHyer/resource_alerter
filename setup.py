@@ -28,6 +28,7 @@ setup(name='resource_alerter',
       include_package_data=True,
       zip_safe=False,
       install_requires=[
+          'psutil',
           'python-daemon',
           'pyyaml'
       ]
