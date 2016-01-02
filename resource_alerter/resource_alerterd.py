@@ -18,77 +18,59 @@ import sys
 import time
 import yaml
 
-__version__ = '0.0.0a1'
+__version__ = '0.0.0a2'
 
 
 class ResourceAlerter:
     def __init__(self, config):
-        self.config = config
+        self.config = config  # Dictionary from YAML configuration file
         self.last_cpu_check = None
+        self.last_cpu_override = None
         self.last_io_check = None
+        self.last_io_override = None
         self.last_ram_check = None
+        self.last_ram_override = None
         self.pidfile_path = '/var/run/resource_alerterd/resource_alerterd.pid'
         self.pidfile_timeout = 5
+        self.pids_same = False  # True if PIDs since last check highly similar
         self.old_pid_list = []
-        self.start_time = None
+        self.stable_cpu_ref = None  # CPU usage at last broadcast
+        self.stable_io_ref = None  # IO usage at last broadcast
+        self.stable_ram_ref = None  # RAM usage at last broadcast
+        self.start_time = None  # Time current resource check began
         self.stdin_path = '/dev/null'
         self.stderr_path = '/dev/null'
         self.stdout_path = '/dev/null'
-        self.wall_critical = False
-        self.wall_warning = False
+        self.wall_critical = False  # Broadcast critical resource use
+        self.wall_warning = False  # Broadcast high resource use
 
-    def cpu_check(self):
-        """Checks CPU usage
+    @staticmethod
+    def is_stable(bound_diff=None, current_state=None,
+                  stable_state=None):
+        """Determines if resource usage is stable or not
 
-        :return: does not return anything
-        :rtype: N/A
+        :param bound_diff: difference from steady state before unstable
+        :type bound_diff: float
+
+        :param current_state: current resource usage
+        :type current_state: float
+
+        :param stable_state: reference point to determine stability
+        :type stable_state: float
+
+        :return: True if resource is table else False
+        :rtype: bool
         """
 
-        info_logger.info('Starting CPU usage check')
-        debug_logger.debug('Calculating time since last CPU check')
-        if self.last_cpu_check is None:
-            delta_check_ratio = None
-            info_logger.info('CPU usage has never been checked by this '
-                             'instance of resource_alerterd')
-            psutil.cpu_percent()  # Passing first call silently since it is bad
-            time.sleep(0.5)  # 0.1 sec minimum required after initial check
+        lower_bound = stable_state - bound_diff
+        upper_bound = stable_state + bound_diff
+        if current_state < lower_bound or current_state > upper_bound:
+            return False
         else:
-            delta_check_time = self.start_time - self.last_cpu_check
-            debug_logger.debug(
-                    'Time since last CPU check: {0}'.format(delta_check_time))
-            delta_check_ratio = delta_check_time / self.config[
-                'cpu_check_delay']
-        debug_logger.debug('CPU check delay time: {0}'.format(
-                self.config['cpu_check_delay']))
-        if delta_check_ratio >= 0.95 or delta_check_ratio is None:
-            info_logger.info('Time since last check is close to or greater '
-                             'than delay time: checking cpu usage')
-            cpu_usage = psutil.cpu_percent()
-            debug_logger.debug('CPU Usage: {0}'.format(cpu_usage))
-            if cpu_usage >= self.config['cpu_critical_level']:
-                critical_logger.critical(
-                        'CPU Usage Critical: {0}'.format(cpu_usage))
-                if self.wall_critical:
-                    message = 'CPU Usage Critical: {0}\nIt is recommended ' \
-                              'that you do not start any CPU intensive ' \
-                              'processes at this time.'
-                    subprocess.call(['wall', message])
-            elif cpu_usage >= self.config['cpu_warning_level']:
-                warning_logger.warning('CPU Usage Warning: {0}'.format(
-                        cpu_usage))
-                if self.wall_warning:
-                    message = 'CPU Usage Warning: {0}\nIt is recommended ' \
-                              'that you do not start any CPU intensive ' \
-                              'processes at this time.'
-                    subprocess.call(['wall', message])
-            self.last_cpu_check = time.time()
-            info_logger.info('CPU usage check complete')
-        else:
-            info_logger.info('Time since last check is not close to or '
-                             'greater than delay time: skipping cpu usage '
-                             'check')
+            return True
 
-    def non_kernel_pids(self, pids_list):
+    @staticmethod
+    def non_kernel_pids(pids_list):
         """Filter out kernel processes from a list of process IDs
 
         :param pids_list: list of pids
@@ -99,48 +81,391 @@ class ResourceAlerter:
         """
 
         info_logger.info('Filtering out kernel PIDs')
-        debug_logger.debug('Raw PID List:\n{0}'.format('\n'.join(pids_list)))
+        debug_logger.debug('Raw PID List: {0}'.format(', '.join(pids_list)))
         non_kernel_pids = []
         for pid in pids_list:
             pid_exe_path = '/proc/{0}/exe'.format(str(pid))
             try:
                 assert bool(os.readlink(pid_exe_path)) is True  # Link exists
                 non_kernel_pids.append(pid)  # Link exists = non-kernel pid
-            except FileNotFoundError:  # Link doesn't exist
-                pass  # Link doesn't exist = kernel-pid
+            except (FileNotFoundError, AssertionError):  # Link doesn't exist
+                pass  # Link doesn't exist = kernel pid = do not add to list
         info_logger.info('Finished filtering kernel PIDs')
         debug_logger.debug(
-                'Filtered PID List\n{0}'.format('\n'.join(non_kernel_pids)))
+                'Filtered PID List: {0}'.format(', '.join(non_kernel_pids)))
         return non_kernel_pids
 
-    def run(self):
-        # See if OS has 'wall_critical' command to broadcast resource usage
+    @staticmethod
+    def wall(resource=None, level=None, usage=None):
+        """Attempts to broadcast wall message and logs error if it cannot
+
+        :param resource: resource type ['CPU', 'RAM', 'IO']
+        :type resource: str
+
+        :param level: usage level of resource ['Warning', 'Critical']
+        :type level: str
+
+        :param usage: resource usage quantity
+        :type usage: str, int, or float
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        message = '{0} Usage {1}: {2}\nIt is recommended that you do not ' \
+                  'start any {0} intensive processes at this ' \
+                  'time.'.format(resource, level, str(usage))
+        try:
+            info_logger.info('Attempting broadcast')
+            subprocess.call(['wall', message])
+            info_logger.info('Broadcast successful')
+        except OSError as error:
+            info_logger.info(
+                    'Broadcast unsuccessful: see error log for more info')
+            error_message = '{0}: Cannot send broadcast via the program ' \
+                            '"wall"'.format(error)
+            error_logger.error(error_message)
+
+    def check_wall(self):
+        """See if daemon can/should broadcast high usage messages via 'wall'
+
+        :returns: nothing
+        :rtype: N/A
+        """
+
         if bool(shutil.which('wall')):
             if self.config['critical_wall_message']:
                 self.wall_critical = True
             if self.config['warning_wall_message']:
                 self.wall_warning = True
+
+    def cpu_check(self):
+        """Checks CPU usage, logs and/or broadcasts high usage
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        info_logger.info('Determining if CPU usage check is needed')
+
+        # Determine if override should be put into effect
+        override = False
+        if self.last_cpu_override is None:
+            override = True
+            info_logger.info('CPU usage has never been checked by this '
+                             'instance of resource_alerterd: CPU-check '
+                             'override activated')
+        else:
+            delta_override_time = self.start_time - self.last_cpu_override
+            debug_logger.debug('CPU override delay time: {0} sec'.format(
+                    str(self.config['cpu_override_delay'])))
+            debug_logger.debug('Time since last CPU-check override: '
+                               '{0} s'.format(str(delta_override_time)))
+            if delta_override_time >= self.config['cpu_override_delay']:
+                override = True
+                info_logger.info('Time since last override is greater than '
+                                 'CPU override check delay: CPU-check '
+                                 'override activated')
+
+        # Skip CPU usage check if PID lists are similar and override inactive
+        if not override and self.pids_same:
+            info_logger.info('PIDs are highly similar to last check and '
+                             'CPU-check override is not active: skipping CPU '
+                             'usage check')
+            return  # Exit CPU usage check silently
+
+        # Determine if sufficient time has past since last CPU check to
+        # justify checking CPU usage now
+        check_cpu = False
+        debug_logger.debug('Calculating time since last CPU check')
+        if self.last_cpu_check is None:
+            check_cpu = True
+            info_logger.info('CPU usage has never been checked by this '
+                             'instance of resource_alerterd: checking CPU '
+                             'usage')
+            psutil.cpu_percent()  # Passing first call silently since it is bad
+            time.sleep(0.25)  # 0.1 sec minimum required after initial check
+        elif override:
+            check_cpu = True
+            info_logger.info('CPU-check override active: checking CPU usage')
+        else:
+            delta_check_time = self.start_time - self.last_cpu_check
+            debug_logger.debug('CPU check delay time: {0} sec'.format(
+                    str(self.config['cpu_check_delay'])))
+            debug_logger.debug(
+                    'Time since last CPU check: {0} sec'.format(
+                            str(delta_check_time)))
+            delta_check_ratio = delta_check_time / self.config[
+                'cpu_check_delay']
+            if delta_check_ratio >= 0.95:
+                check_cpu = True
+                info_logger.info('Time since last check is close to or '
+                                 'greater than CPU check delay time: checking '
+                                 'CPU usage')
+            else:
+                info_logger.info('Time since last check is not close to or '
+                                 'greater than delay CPU check delay time: '
+                                 'skipping CPU usage check')
+
+        # Check CPU usage and log/broadcast high usage
+        if check_cpu:
+            info_logger.info('Determining CPU usage')
+            cpu_usage = psutil.cpu_percent()
+            debug_logger.debug('CPU Usage: {0}%'.format(str(cpu_usage)))
+
+            # See if CPU usage is stable
+            debug_logger.debug('Determining if CPU usage has changed '
+                               'significantly since last broadcast')
+            if self.stable_cpu_ref is None:
+                stable = False
+                debug_logger.debug('CPU usage has never been checked by this '
+                                   'instance of resource_alerted: '
+                                   'broadcasting enabled')
+            elif override:
+                stable = False
+                info_logger.info('CPU-check override active: broadcasting '
+                                 'enabled')
+            else:
+                stable = self.is_stable(
+                        bound_diff=self.config['cpu_stable_diff'],
+                        current_state=cpu_usage,
+                        stable_state=self.stable_cpu_ref)
+                if not stable:
+                    debug_logger.debug('CPU usage has changed significantly '
+                                       'since last broadcast: broadcasting '
+                                       'enabled')
+                else:
+                    debug_logger.debug('CPU usage has not changed '
+                                       'significantly since last broadcast: '
+                                       'broadcasting disabled')
+
+            # Skip logging/broadcast if CPU usage is stable,
+            # log/broadcast and reset reference point if not
+            if not stable:
+                if cpu_usage >= self.config['cpu_critical_level']:
+                    self.stable_cpu_ref = cpu_usage  # Reset reference
+                    critical_logger.critical(
+                            'CPU Usage Critical: {0}%'.format(str(cpu_usage)))
+                    if self.wall_critical:  # Broadcast critical CPU usage
+                        self.wall(resource='CPU',
+                                  level='Critical',
+                                  usage=cpu_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_cpu_override = self.start_time
+                        debug_logger.debug('Reset last CPU-check override '
+                                           'time')
+                elif cpu_usage >= self.config['cpu_warning_level']:
+                    self.stable_cpu_ref = cpu_usage  # Reset reference
+                    warning_logger.warning('CPU Usage Warning: {0}%'.format(
+                            str(cpu_usage)))
+                    if self.wall_warning:  # Broadcast CPU usage warning
+                        self.wall(resource='CPU',
+                                  level='Warning',
+                                  usage=cpu_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_cpu_override = self.start_time
+                        debug_logger.debug('Reset last CPU-check override '
+                                           'time')
+                else:
+                    debug_logger.debug('CPU usage is not above Warning or '
+                                       'Critical Threshold: skipping '
+                                       'broadcast')
+
+            # Reset time since last check
+            self.last_cpu_check = self.start_time
+            debug_logger.debug('Reset last CPU check time')
+
+    def pids_same_test(self):
+        """Determine how similar current PIDs are to last resource check
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        new_pid_list = self.non_kernel_pids(psutil.pids())
+        info_logger.info('Comparing similarity in PID lists since last '
+                         'resource check')
+        compare_pids = difflib.SequenceMatcher(new_pid_list,
+                                               self.old_pid_list)
+        pids_similarity = compare_pids.ratio() * 100.0
+        debug_logger.debug('PID lists similarity: {0}%'.format(str(
+                pids_similarity)))
+        debug_logger.debug('Minimum PID Similarity Permitted: '
+                           '{0}%'.format(self.config['min_pid_same']))
+        self.old_pid_list = new_pid_list[:]  # Replace old list w/ new list
+        if pids_similarity <= self.config['min_pid_same']:
+            self.pids_same = False
+            info_logger.info('PID lists sufficiently different: '
+                             'performing resource checks')
+        else:
+            self.pids_same = True
+            info_logger.info('PID lists sufficiently similar: '
+                             'skipping resource checks unless overrides '
+                             'activate')
+
+    def ram_check(self):
+        """Checks RAM usage, logs and/or broadcasts high usage
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        info_logger.info('Determining if RAM usage check is needed')
+
+        # Determine if override should be put into effect
+        override = False
+        if self.last_ram_override is None:
+            override = True
+            info_logger.info('RAM usage has never been checked by this '
+                             'instance of resource_alerterd: RAM-check '
+                             'override activated')
+        else:
+            delta_override_time = self.start_time - self.last_ram_override
+            debug_logger.debug('RAM override delay time: {0} sec'.format(
+                    str(self.config['ram_override_delay'])))
+            debug_logger.debug('Time since last RAM-check override: '
+                               '{0} sec'.format(str(delta_override_time)))
+            if delta_override_time >= self.config['ram_override_delay']:
+                override = True
+                info_logger.info('Time since last override is greater than '
+                                 'RAM override check delay: RAM-check '
+                                 'override activated')
+
+        # Skip RAM usage check if PID lists are similar and override inactive
+        if not override and self.pids_same:
+            info_logger.info('PIDs are highly similar to last check and '
+                             'RAM-check override is not active: skipping RAM '
+                             'usage check')
+            return  # Exit CPU usage check silently
+
+        # Determine if sufficient time has past since last RAM check to
+        # justify checking RAM usage now
+        check_ram = False
+        debug_logger.debug('Calculating time since last RAM check')
+        if self.last_ram_check is None:
+            check_ram = True
+            info_logger.info('RAM usage has never been checked by this '
+                             'instance of resource_alerterd: checking RAM '
+                             'usage')
+        elif override:
+            check_ram = True
+            info_logger.info('RAM-check override active: checking RAM usage')
+        else:
+            delta_check_time = self.start_time - self.last_ram_check
+            debug_logger.debug('RAM check delay time: {0} sec'.format(
+                    str(self.config['ram_check_delay'])))
+            debug_logger.debug(
+                    'Time since last ram check: {0} sec'.format(
+                            str(delta_check_time)))
+            delta_check_ratio = delta_check_time / self.config[
+                'ram_check_delay']
+            if delta_check_ratio >= 0.95:
+                check_ram = True
+                info_logger.info('Time since last check is close to or '
+                                 'greater than RAM check delay time: checking '
+                                 'RAM usage')
+            else:
+                info_logger.info('Time since last check is not close to or '
+                                 'greater than delay RAM check delay time: '
+                                 'skipping RAM usage check')
+
+        # Check RAM usage and log/broadcast high usage
+        if check_ram:
+            info_logger.info('Determining RAM usage')
+            ram_usage = psutil.virtual_memory().percent
+            debug_logger.debug('RAM Usage: {0}%'.format(str(ram_usage)))
+
+            # See if CPU usage is stable
+            debug_logger.debug('Determining if RAM usage has changed '
+                               'significantly since last broadcast')
+            if self.stable_ram_ref is None:
+                stable = False
+                debug_logger.debug('RAM usage has never been checked by this '
+                                   'instance of resource_alerted: '
+                                   'broadcasting enabled')
+            elif override:
+                stable = False
+                info_logger.info('RAM-check override active: broadcasting '
+                                 'enabled')
+            else:
+                stable = self.is_stable(
+                        bound_diff=self.config['ram_stable_diff'],
+                        current_state=ram_usage,
+                        stable_state=self.stable_ram_ref)
+                if not stable:
+                    debug_logger.debug('RAM usage has changed significantly '
+                                       'since last broadcast: broadcasting '
+                                       'enabled')
+                else:
+                    debug_logger.debug('RAM usage has not changed '
+                                       'significantly since last broadcast: '
+                                       'broadcasting disabled')
+
+            # Skip logging/broadcast if RAM usage is stable,
+            # log/broadcast and reset reference point if not
+            if not stable:
+                if ram_usage >= self.config['ram_critical_level']:
+                    self.stable_ram_ref = ram_usage  # Reset reference
+                    critical_logger.critical(
+                            'RAM Usage Critical: {0}%'.format(str(ram_usage)))
+                    if self.wall_critical:  # Broadcast critical RAM usage
+                        self.wall(resource='RAM',
+                                  level='Critical',
+                                  usage=ram_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_ram_override = self.start_time
+                        debug_logger.debug('Reset last RAM-check override '
+                                           'time')
+                elif ram_usage >= self.config['ram_warning_level']:
+                    self.stable_ram_ref = ram_usage  # Reset reference
+                    warning_logger.warning('RAM Usage Warning: {0}%'.format(
+                            str(ram_usage)))
+                    if self.wall_warning:  # Broadcast RAM usage warning
+                        self.wall(resource='RAM',
+                                  level='Warning',
+                                  usage=ram_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_ram_override = self.start_time
+                        debug_logger.debug('Reset last RAM-check override '
+                                           'time')
+                else:
+                    debug_logger.debug('RAM usage is not above Warning or '
+                                       'Critical Threshold: skipping '
+                                       'broadcast')
+
+            # Reset time since last check
+            self.last_ram_check = self.start_time
+            debug_logger.debug('Reset last RAM check time')
+
+    def run(self):
+        """Main loop for daemon
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        # See if OS has 'wall' command to broadcast resource usage
+        self.check_wall()
+
         # Main daemon
         while True:
+            # Pre-resource check necessities
             self.start_time = time.time()
             info_logger.info('Starting resource check')
-            new_pid_list = self.non_kernel_pids(psutil.pids())
-            info_logger.info('Comparing similarity in PID lists since last '
-                             'resource check')
-            compare_pids = difflib.SequenceMatcher(new_pid_list,
-                                                   self.old_pid_list)
-            debug_logger.debug('PID lists similarity: {0}'.format(str(
-                    compare_pids.ratio())))
-            debug_logger.debug('Minimum PID Similarity Permitted: '
-                               '{0}'.format(self.config['min_pid_same']))
-            if compare_pids.ratio() <= self.config['min_pid_same']:
-                info_logger.info('PID lists sufficiently different: '
-                                 'performing resource check')
-                self.cpu_check()
-            else:
-                info_logger.info('PID lists sufficiently similar: '
-                                 'skipping resource check')
-                # TODO: Time calculations here
+            self.pids_same_test()
+
+            # Run resource checks
+            self.cpu_check()
+            self.ram_check()
+            # self.io_check()
+            info_logger.info('Resource check complete')
+
+            # Determine sleep time until next resource check
+            # TODO: Auto-time calculations here
 
 
 if __name__ == '__main__':
