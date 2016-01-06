@@ -18,12 +18,13 @@ import sys
 import time
 import yaml
 
-__version__ = '0.0.0a2'
+__version__ = '0.0.0a3'
 
 
 class ResourceAlerter:
     def __init__(self, config):
         self.config = config  # Dictionary from YAML configuration file
+        self.io_max = None  # System dependent max IO percentage
         self.last_cpu_check = None
         self.last_cpu_override = None
         self.last_io_check = None
@@ -277,6 +278,142 @@ class ResourceAlerter:
             self.last_cpu_check = self.start_time
             debug_logger.debug('Reset last CPU check time')
 
+    def io_check(self):
+        """Checks IO Wait, logs and/or broadcasts high usage
+
+        :return: nothing
+        :rtype: N/A
+        """
+
+        info_logger.info('Determining if IO usage check is needed')
+
+        # Determine if override should be put into effect
+        override = False
+        if self.last_io_override is None:
+            override = True
+            info_logger.info('IO usage has never been checked by this '
+                             'instance of resource_alerterd: IO-check '
+                             'override activated')
+        else:
+            delta_override_time = self.start_time - self.last_io_override
+            debug_logger.debug('IO override delay time: {0} sec'.format(
+                    str(self.config['io_override_delay'])))
+            debug_logger.debug('Time since last IO-check override: '
+                               '{0} sec'.format(str(delta_override_time)))
+            if delta_override_time >= self.config['io_override_delay']:
+                override = True
+                info_logger.info('Time since last override is greater than '
+                                 'IO override check delay: IO-check '
+                                 'override activated')
+
+        # Skip IO usage check if PID lists are similar and override inactive
+        if not override and self.pids_same:
+            info_logger.info('PIDs are highly similar to last check and '
+                             'IO-check override is not active: skipping IO '
+                             'usage check')
+            return  # Exit IO usage check silently
+
+        # Determine if sufficient time has past since last IO check to
+        # justify checking IO usage now
+        check_io = False
+        debug_logger.debug('Calculating time since last IO usage')
+        if self.last_io_check is None:
+            check_io = True
+            info_logger.info('IO usage has never been checked by this '
+                             'instance of resource_alerterd: checking IO '
+                             'usage')
+        elif override:
+            check_io = True
+            info_logger.info('IO-check override active: checking IO usage')
+        else:
+            delta_check_time = self.start_time - self.last_io_check
+            debug_logger.debug('IO check delay time: {0} sec'.format(
+                    str(self.config['io_check_delay'])))
+            debug_logger.debug(
+                    'Time since last IO check: {0} sec'.format(
+                            str(delta_check_time)))
+            delta_check_ratio = delta_check_time / self.config[
+                'io_check_delay']
+            if delta_check_ratio >= 0.95:
+                check_io = True
+                info_logger.info('Time since last check is close to or '
+                                 'greater than IO check delay time: checking '
+                                 'IO usage')
+            else:
+                info_logger.info('Time since last check is not close to or '
+                                 'greater than delay IO check delay time: '
+                                 'skipping IO usage check')
+
+        # Check IO Wait and log/broadcast high usage
+        if check_io:
+            info_logger.info('Determining IO usage')
+            io_usage = psutil.cpu_times().iowait / self.io_max
+            debug_logger.debug('IO Usage: {0}%'.format(str(io_usage)))
+
+            # See if IO usage is stable
+            debug_logger.debug('Determining if IO usage has changed '
+                               'significantly since last broadcast')
+            if self.stable_io_ref is None:
+                stable = False
+                debug_logger.debug('IO usage has never been checked by this '
+                                   'instance of resource_alerted: '
+                                   'broadcasting enabled')
+            elif override:
+                stable = False
+                info_logger.info('IO-check override active: broadcasting '
+                                 'enabled')
+            else:
+                stable = self.is_stable(
+                        bound_diff=self.config['io_stable_diff'],
+                        current_state=io_usage,
+                        stable_state=self.stable_io_ref)
+                if not stable:
+                    debug_logger.debug('IO usage has changed significantly '
+                                       'since last broadcast: broadcasting '
+                                       'enabled')
+                else:
+                    debug_logger.debug('IO usage has not changed '
+                                       'significantly since last broadcast: '
+                                       'broadcasting disabled')
+
+            # Skip logging/broadcast if IO usage is stable,
+            # log/broadcast and reset reference point if not
+            if not stable:
+                if io_usage >= self.config['ram_critical_level']:
+                    self.stable_io_ref = io_usage  # Reset reference
+                    critical_logger.critical(
+                            'IO Usage Critical: {0}%'.format(str(io_usage)))
+                    if self.wall_critical:  # Broadcast critical IO usage
+                        self.wall(resource='IO',
+                                  level='Critical',
+                                  usage=io_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_ram_override = self.start_time
+                        debug_logger.debug('Reset last IO-check override '
+                                           'time')
+                elif io_usage >= self.config['ram_warning_level']:
+                    self.stable_ram_ref = io_usage  # Reset reference
+                    warning_logger.warning('IO Usage Warning: {0}%'.format(
+                            str(io_usage)))
+                    if self.wall_warning:  # Broadcast IO usage warning
+                        self.wall(resource='IO',
+                                  level='Warning',
+                                  usage=io_usage)
+                    # If broadcast performed under override, reset override
+                    if override:
+                        self.last_ram_override = self.start_time
+                        debug_logger.debug('Reset last IO-check override '
+                                           'time')
+                else:
+                    debug_logger.debug('IO usage is not above Warning or '
+                                       'Critical Threshold: skipping '
+                                       'broadcast')
+
+            # Reset time since last check
+            self.last_io_check = self.start_time
+            debug_logger.debug('Reset last IO check time')
+
     def pids_same_test(self):
         """Determine how similar current PIDs are to last resource check
 
@@ -338,7 +475,7 @@ class ResourceAlerter:
             info_logger.info('PIDs are highly similar to last check and '
                              'RAM-check override is not active: skipping RAM '
                              'usage check')
-            return  # Exit CPU usage check silently
+            return  # Exit RAM usage check silently
 
         # Determine if sufficient time has past since last RAM check to
         # justify checking RAM usage now
@@ -357,7 +494,7 @@ class ResourceAlerter:
             debug_logger.debug('RAM check delay time: {0} sec'.format(
                     str(self.config['ram_check_delay'])))
             debug_logger.debug(
-                    'Time since last ram check: {0} sec'.format(
+                    'Time since last RAM check: {0} sec'.format(
                             str(delta_check_time)))
             delta_check_ratio = delta_check_time / self.config[
                 'ram_check_delay']
@@ -451,6 +588,9 @@ class ResourceAlerter:
         # See if OS has 'wall' command to broadcast resource usage
         self.check_wall()
 
+        # Calculate maximum acceptable IO Wait
+        self.io_max = 100.0 / float(psutil.cpu_count())
+
         # Main daemon
         while True:
             # Pre-resource check necessities
@@ -461,7 +601,7 @@ class ResourceAlerter:
             # Run resource checks
             self.cpu_check()
             self.ram_check()
-            # self.io_check()
+            self.io_check()
             info_logger.info('Resource check complete')
 
             # Determine sleep time until next resource check
