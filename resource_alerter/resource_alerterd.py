@@ -18,6 +18,7 @@ Synopsis:
 Important Notes:
 
     1) This process should be run with root permissions to function properly
+
     2) Run resource_alerter_setup.py before starting this daemon for the
        first time
 """

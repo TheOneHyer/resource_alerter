@@ -10,7 +10,7 @@ import argparse
 import os
 import sys
 
-__version__ = '0.0.0a1'
+__version__ = '0.0.0a2'
 
 
 class InputError(Exception):
@@ -76,7 +76,7 @@ def main(args):
             message = 'Create {0} [yes/no]: '.format(runtime_folder)
             while True:
                 try:
-                    answer = robust_input(message).lower()
+                    answer = robust_input(message)
                     if answer not in valid:
                         raise InputError
                     else:
@@ -100,7 +100,7 @@ def main(args):
             message = 'Create {0} [yes/no]: '.format(logging_folder)
             while True:
                 try:
-                    answer = robust_input(message).lower()
+                    answer = robust_input(message)
                     if answer not in valid:
                         raise InputError
                     else:
@@ -112,7 +112,6 @@ def main(args):
         if create:
             os.mkdir(logging_folder)
             print('{0} successfully created'.format(logging_folder))
-    # TODO: Add ability to alter config file
 
 
 if __name__ == '__main__':
