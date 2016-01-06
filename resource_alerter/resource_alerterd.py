@@ -18,7 +18,7 @@ import sys
 import time
 import yaml
 
-__version__ = '0.0.0a3'
+__version__ = '0.0.0a4'
 
 
 class ResourceAlerter:
@@ -578,6 +578,25 @@ class ResourceAlerter:
             self.last_ram_check = self.start_time
             debug_logger.debug('Reset last RAM check time')
 
+    def sleep_time(self):
+        """Calculate time until next resource check is required
+
+        :return: time for daemon to sleep
+        :rtype: float
+        """
+
+        debug_logger.debug('Calculating time until next resource check')
+        next_cpu_check = self.last_cpu_check + config_dict['cpu_check_delay']
+        next_io_check = self.last_io_check + config_dict['io_check_delay']
+        next_ram_check = self.last_ram_check + config_dict['ram_check_delay']
+        next_resource_check = min(next_cpu_check,
+                                  next_io_check,
+                                  next_ram_check)
+        sleep_time = next_resource_check - time.time()
+        sleep_time = 0 if sleep_time < 0 else sleep_time  # Avoid negatives
+        info_logger.info('Sleeping for {0} sec'.format(sleep_time))
+        return sleep_time
+
     def run(self):
         """Main loop for daemon
 
@@ -605,7 +624,7 @@ class ResourceAlerter:
             info_logger.info('Resource check complete')
 
             # Determine sleep time until next resource check
-            # TODO: Auto-time calculations here
+            time.sleep(self.sleep_time())
 
 
 if __name__ == '__main__':
