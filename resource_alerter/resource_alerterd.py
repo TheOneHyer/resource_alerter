@@ -1,8 +1,25 @@
 #! /usr/bin/env python
 
-"""Monitors CPU, RAM, and IO wait
+"""Monitors CPU, RAM, and IO Wait and warns of/broadcasts high usage
 
-NEEDS ROOT PERMISSIONS TO RUN!
+Usage:
+
+    resource_alerterd.py {start | stop | restart}
+
+Synopsis:
+
+    resource_alerterd is a Python daemon designed for Unix-like systems. As
+    the name, it monitors system resource usage and alerts users to high
+    resource usage. Specifically, resource_alerterd monitors CPU, RAM, and IO
+    usage and logs use above specified percentage thresholds. Many aspects
+    of the alerting algorithm are customizable in the configuration file.
+    See README.md for more details.
+
+Important Notes:
+
+    1) This process should be run with root permissions to function properly
+    2) Run resource_alerter_setup.py before starting this daemon for the
+       first time
 """
 
 from daemon import runner
@@ -18,11 +35,57 @@ import sys
 import time
 import yaml
 
-__version__ = '0.0.0a4'
+__author__ = 'Alex Hyer'
+__email__ = 'theonehyer@gmail.com'
+__license__ = 'GPLv3'
+__maintainer__ = 'Alex Hyer'
+__status__ = 'Development'
+__version__ = '0.0.0a6'
 
 
 class ResourceAlerter:
+    """Daemon-ized, checks various resource usage and alerts users
+
+    This class is, for most intents and purposes, the actual run time process
+    of resource_alerterd. In brief, this class monitors CPU, RAM, and IO
+    usage and then alerts users to high usage of these resources.
+
+    Function Summaries
+    ------------------
+
+    __init__: initializes run-time variables
+
+    is_stable: static, determine if a given resource usage is stable
+
+    non_kernel_pids: static, filter out kernel PIDs from a PID list
+
+    wall: static, script and broadcast resource usage alert via 'wall'
+
+    check_wall: determine if daemon can use 'wall'
+
+    cpu_check: check CPU usage and log/broadcast high usage
+
+    io_check: check IO usage and log/broadcast high usage
+
+    pids_same_test: determine if PIDs have changed since last resource check
+
+    ram_check: check RAM usage and log/broadcast high usage
+
+    run: main loop of daemon, calls other functions listed here
+
+    sleep_time: determine how long daemon should sleep between resource checks
+    """
+
     def __init__(self, config):
+        """Initializes many essential daemon-wide runt-time variables
+
+        :param config: configuration file as dictionary
+        :type: dict
+
+        :return: nothing
+        :rtype: N/A
+        """
+
         self.config = config  # Dictionary from YAML configuration file
         self.io_max = None  # System dependent max IO percentage
         self.last_cpu_check = None
@@ -34,14 +97,14 @@ class ResourceAlerter:
         self.pidfile_path = '/var/run/resource_alerterd/resource_alerterd.pid'
         self.pidfile_timeout = 5
         self.pids_same = False  # True if PIDs since last check highly similar
-        self.old_pid_list = []
+        self.old_pid_list = []  # List of PIDs during last resource check
         self.stable_cpu_ref = None  # CPU usage at last broadcast
         self.stable_io_ref = None  # IO usage at last broadcast
         self.stable_ram_ref = None  # RAM usage at last broadcast
         self.start_time = None  # Time current resource check began
-        self.stdin_path = '/dev/null'
-        self.stderr_path = '/dev/null'
-        self.stdout_path = '/dev/null'
+        self.stdin_path = '/dev/null'  # No STDIN
+        self.stderr_path = '/dev/null'  # No STDERR
+        self.stdout_path = '/dev/null'  # No STDOUT
         self.wall_critical = False  # Broadcast critical resource use
         self.wall_warning = False  # Broadcast high resource use
 
@@ -66,9 +129,9 @@ class ResourceAlerter:
         lower_bound = stable_state - bound_diff
         upper_bound = stable_state + bound_diff
         if current_state < lower_bound or current_state > upper_bound:
-            return False
+            return False  # Unstable
         else:
-            return True
+            return True  # Stable
 
     @staticmethod
     def non_kernel_pids(pids_list):
@@ -135,10 +198,19 @@ class ResourceAlerter:
         """
 
         if bool(shutil.which('wall')):
+            debug_logger.debug('Program "wall" found')
             if self.config['critical_wall_message']:
                 self.wall_critical = True
+                debug_logger.debug('Critical broadcasts enabled')
+            else:
+                debug_logger.debug('Critical broadcasts disabled')
             if self.config['warning_wall_message']:
                 self.wall_warning = True
+                debug_logger.debug('Warning broadcasts enabled')
+            else:
+                debug_logger.debug('Warning broadcasts disabled')
+        else:
+            debug_logger.debug('Program "wall" not found')
 
     def cpu_check(self):
         """Checks CPU usage, logs and/or broadcasts high usage
@@ -578,25 +650,6 @@ class ResourceAlerter:
             self.last_ram_check = self.start_time
             debug_logger.debug('Reset last RAM check time')
 
-    def sleep_time(self):
-        """Calculate time until next resource check is required
-
-        :return: time for daemon to sleep
-        :rtype: float
-        """
-
-        debug_logger.debug('Calculating time until next resource check')
-        next_cpu_check = self.last_cpu_check + config_dict['cpu_check_delay']
-        next_io_check = self.last_io_check + config_dict['io_check_delay']
-        next_ram_check = self.last_ram_check + config_dict['ram_check_delay']
-        next_resource_check = min(next_cpu_check,
-                                  next_io_check,
-                                  next_ram_check)
-        sleep_time = next_resource_check - time.time()
-        sleep_time = 0 if sleep_time < 0 else sleep_time  # Avoid negatives
-        info_logger.info('Sleeping for {0} sec'.format(sleep_time))
-        return sleep_time
-
     def run(self):
         """Main loop for daemon
 
@@ -626,6 +679,25 @@ class ResourceAlerter:
             # Determine sleep time until next resource check
             time.sleep(self.sleep_time())
 
+    def sleep_time(self):
+        """Calculate time until next resource check is required
+
+        :return: time for daemon to sleep
+        :rtype: float
+        """
+
+        debug_logger.debug('Calculating time until next resource check')
+        next_cpu_check = self.last_cpu_check + config_dict['cpu_check_delay']
+        next_io_check = self.last_io_check + config_dict['io_check_delay']
+        next_ram_check = self.last_ram_check + config_dict['ram_check_delay']
+        next_resource_check = min(next_cpu_check,
+                                  next_io_check,
+                                  next_ram_check)
+        sleep_time = next_resource_check - time.time()
+        sleep_time = 0 if sleep_time < 0 else sleep_time  # Avoid negatives
+        info_logger.info('Sleeping for {0} sec'.format(sleep_time))
+        return sleep_time
+
 
 if __name__ == '__main__':
     # Parse configuration file and instantiate class
@@ -636,8 +708,6 @@ if __name__ == '__main__':
 
     # Parse logging config file and create loggers
     with open(resource_string(__file__, 'resource_alerterd.logging.conf'),
-              # with open('/usr/lib/python3.4/site-packages'
-              #           '/resource_alerter/resource_alerterd.logging.conf',
               'rU') as config_handle:
         logging_config_dict = yaml.load(config_handle)
     logging.config.dictConfig(logging_config_dict)
