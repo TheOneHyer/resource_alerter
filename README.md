@@ -10,11 +10,11 @@ system resource usage and alerts users to high usage.
 Quick Start
 -----------
 
->>>>pip install resource_alerter
->>>>
->>>>sudo resource_alerter_setup.py --force-yes
->>>>
->>>>sudo resource_alerterd.py start
+> pip install resource_alerter
+>
+> sudo resource_alerter_setup.py --force-yes
+>
+> sudo resource_alerterd.py start
 
 Synopsis
 --------
@@ -36,27 +36,46 @@ algorithm sections below.
 Algorithm
 ---------
 
->>>>1. Read in logging configuration file
->>>>2. Create loggers
->>>>3. Read in daemon configuration file
->>>>4. Initialize daemon
->>>>5. See if 'wall' is available for broadcasts
->>>>6. Calculate max IO Wait as 100.0 / # of cores
->>>>7. Start infinite loop
->>>>8. Calculate similarity to PID list of last resource check
->>>>9. Reset last PID list w/ current one
->>>>10. for RESOURCE in CPU, RAM, IO Wait:
->>>>* Calculate time since RESOURCE override last active, activate if too long
->>>>* Skip RESOURCE check if PID similar and override inactive
->>>>* Calculate time since last RESOURCE check
->>>>* Perform RESOURCE check if too long since last check or override active
->>>>* Obtain RESOURCE usage
->>>>* See if RESOURCE usage has changed significantly since last log/broadcast
->>>>* If RESOURCE usage deemed "unstable" and above threshold, log/broadcast
->>>>* If broadcast, reset "stability" reference point to RESOURCE usage
->>>>* Reset last RESOURCE check time to current time
->>>>11. Calculate time to sleep until next resource check
->>>>12. Sleep until next resource check
+The following algorithm summarizes all steps performed by resource_alerted. 
+The text-image after the algorithm visualizes the filters that determine 
+whether or not a high usage broadcast needs to be made in Step 10.
 
-Log Options
------------
+###Algorithm
+
+> 1. Read in logging configuration file
+> 2. Create loggers
+> 3. Read in daemon configuration file
+> 4. Initialize daemon
+> 5. See if 'wall' is available for broadcasts
+> 6. Calculate max IO Wait as 100.0 / # of cores
+> 7. Start infinite loop
+> 8. Calculate similarity to PID list of last resource check
+> 9. Reset last PID list w/ current one
+> 10. for RESOURCE in CPU, RAM, IO Wait:
+>   * Calculate time since RESOURCE override last active, activate if too 
+long
+>   * Skip RESOURCE check if PID similar and override inactive
+>   * Calculate time since last RESOURCE check
+>   * Perform RESOURCE check if too long since last check or override active
+>   * Obtain RESOURCE usage
+>   * See if RESOURCE usage has changed significantly since last 
+log/broadcast
+>   * If RESOURCE usage deemed "unstable" and above threshold, log/broadcast
+>   * If broadcast, reset "stability" reference point to RESOURCE usage
+>   * Reset last RESOURCE check time to current time
+> 11. Calculate time to sleep until next resource check
+> 12. Sleep until next resource check
+
+###Visual Summary - Step 10
+
+    |----------|      |------------|      |----------|      |-----------|      |----------|      |-----------|
+    |          | ---> |            | ---> | Time for | ---> | Resource  | ---> | Resource | ---> | Broadcast |
+    | Resource | ---> |    PID     | ---> | Resource | ---> |           | ---> | Use High |      |-----------|
+    |          | ---> |            | ---> |  Check   | ---> | Stability |      |----------|
+    |          | ---> | Similarity | ---> |          |      |-----------|           ^
+    |  Check   | ---> |            |      |----------|                              |
+    |          |      |------------|                                                |
+    |----------| -------------------> |First Check or Override| --------------------
+
+Configuration File Options
+--------------------------

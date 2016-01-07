@@ -10,7 +10,12 @@ import argparse
 import os
 import sys
 
-__version__ = '0.0.0a2'
+__author__ = 'Alex Hyer'
+__email__ = 'theonehyer@gmail.com'
+__license__ = 'GPLv3'
+__maintainer__ = 'Alex Hyer'
+__status__ = 'Development'
+__version__ = '0.0.0b1'
 
 
 class InputError(Exception):
