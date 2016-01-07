@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='resource_alerter',
-      version='0.0.0b5',
+      version='0.0.0b6',
       description='monitors system resources and alerts users to high usage',
       classifiers=[
           'Development Status :: 4 - Beta',
@@ -18,9 +18,9 @@ setup(name='resource_alerter',
           'Topic :: System :: Monitoring'
       ],
       keywords='daemon resource alerter monitor monitoring log logging',
-      url='https://github.com/Brazelton-Lab/bio_utils/',
+      url='https://github.com/Brazelton-Lab/resource_alerter',
       download_url='https://github.com/TheOneHyer/resource_alerter/tarball/'
-                    + '0.0.0b5',
+                    + '0.0.0b6',
       author='Alex Hyer',
       author_email='theonehyer@gmail.com',
       license='GPLv3',
