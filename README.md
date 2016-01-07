@@ -208,12 +208,12 @@ below:
 * While you cannot directly disable the various filters used in Step 10 to 
 limit unnecessary broadcasts, certain config settings will effectively 
 disable the filters:
-  1) Disable PID similarity check: set min_pid_same to "0.0"
-  2) Disable resource time delay: set [resource]_check_delay to "0.0" (this
+  * Disable PID similarity check: set min_pid_same to "0.0"
+  * Disable resource time delay: set [resource]_check_delay to "0.0" (this
     causes resource_alerted to more or less continuously monitor and log 
     [resource], not recommended)
-  3) Disable resource stability check: set [resource]_stable_diff to "0.0"
-  4) Disable all filters: set [resource]_override_delay to "0.0" (see point
+  * Disable resource stability check: set [resource]_stable_diff to "0.0"
+  * Disable all filters: set [resource]_override_delay to "0.0" (see point
     2 for why this isn't recommended)
     
 * While you cannot directly disable checking a specific resource, you can  
@@ -224,3 +224,22 @@ effectively disable a resource's broadcasts, by setting
 but rather (100.0 / # of cores), setting the IO warning and critical levels to
 (100.0 * # of cores + 0.1) will guarantee that the IO usage broadcast is 
 disabled.*
+
+* To save on resource use by the daemon or high log turnover, tune the 
+[resource]_check_delay and [resource]_override_delay to fit your preferences.
+
+Important Notes
+---------------
+
+* It is highly advised that resource_alerted is started at boot. 
+Accomplishing this is often unique to your operating system but typically 
+consists of adding the lines "resource_alerterd_setup.py --force-yes" and 
+"resource_alerterd" at the end of a specific file.
+
+* You must run "resource_alerterd_setup.py" before starting the daemon.
+
+* You must run both scripts in this package as root for proper functionality
+
+* IO usage check measures IO Wait, not read/write rate.
+
+* IO Wait is not out of 100% but rather (100.0 / # of cores)%.

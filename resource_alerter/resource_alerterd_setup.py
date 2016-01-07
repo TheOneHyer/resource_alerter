@@ -2,7 +2,21 @@
 
 """Setup utility for resource_alerterd
 
-THIS PROGRAM REQUIRES ROOT PERMISSIONS TO EXECUTE PROPERLY
+Usage:
+
+    resource_alerted_setup.py [--force-yes]
+
+Synopsis:
+
+    This script simply creates the log folder and process ID folder required to
+    run resource_alerted. --force-yes just answers yes to all questions
+    asked by this script.
+
+Import Notes:
+
+    1) This process should be run with root permissions to function properly
+
+    2) Run this script before starting this daemon for the first time
 """
 
 from __future__ import print_function
@@ -15,7 +29,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b1'
+__version__ = '0.0.0b2'
 
 
 class InputError(Exception):
