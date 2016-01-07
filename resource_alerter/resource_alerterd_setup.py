@@ -47,7 +47,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b4'
+__version__ = '0.0.0b5'
 
 
 class InputError(Exception):
@@ -84,7 +84,7 @@ def main(args):
     runtime_folder = '/var/run/resource_alerterd'
     if not os.path.isfile(runtime_folder):
         if args.force_yes:
-            create = True
+            answer = 'yes'
         else:
             print('Your system does not have the following folder: {0}\n'
                   'This folder is required and stores important runtime '
@@ -108,7 +108,7 @@ def main(args):
     logging_folder = '/var/log/resource_alerter'
     if not os.path.isfile(logging_folder):
         if args.force_yes:
-            create = True
+            answer = 'yes'
         else:
             print('Your system does not have the following folder: {0}\n'
                   'This folder is required and is where data is logged.')
