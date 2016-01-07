@@ -29,7 +29,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b2'
+__version__ = '0.0.0b3'
 
 
 class InputError(Exception):
@@ -53,17 +53,7 @@ def robust_input(message):
         return raw_input(message)
 
 
-def yes_no(answer):
-    """Provide semi-robust analysis of user answers
-
-    :param answer: String given by user
-    :type answer: str
-
-    :return: True or False based on answer
-    :rtype: bool
-    """
-
-    global valid
+def main(args):
     valid = {
         'yes': True,
         'ye': True,
@@ -72,17 +62,6 @@ def yes_no(answer):
         'n': False
     }
 
-    answer = answer.lower()
-    if answer in valid:
-        return valid[answer]
-    else:
-        # This message should only show up if I didn't write a catch for input
-        print('Answer {0} is not valid: this message is the result of a bug, '
-              'please email theonehyer@gmail.com concerning this error')
-        sys.exit(1)
-
-
-def main(args):
     # Test if runtime folder exists and, if it does not, try to create it
     runtime_folder = '/var/run/resource_alerterd'
     if not os.path.isfile(runtime_folder):
@@ -103,8 +82,7 @@ def main(args):
                 except InputError:
                     print('{0} is not "yes" or "no". Please try '
                           'again.'.format(answer))
-            create = yes_no(answer)
-        if create:
+        if valid[answer]:
             os.mkdir(runtime_folder)
             print('{0} successfully created'.format(runtime_folder))
 
@@ -127,8 +105,7 @@ def main(args):
                 except InputError:
                     print('{0} is not "yes" or "no". Please try '
                           'again.'.format(answer))
-            create = yes_no(answer)
-        if create:
+        if valid[answer]:
             os.mkdir(logging_folder)
             print('{0} successfully created'.format(logging_folder))
 
