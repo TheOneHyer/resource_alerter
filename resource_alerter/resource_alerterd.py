@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b7'
+__version__ = '0.0.0b8'
 
 
 class ResourceAlerter:
@@ -164,7 +164,8 @@ class ResourceAlerter:
         """
 
         info_logger.info('Filtering out kernel PIDs')
-        debug_logger.debug('Raw PID List: {0}'.format(', '.join(pids_list)))
+        str_pids = [str(pid) for pid in pids_list]
+        debug_logger.debug('Raw PID List: {0}'.format(', '.join(str_pids)))
         non_kernel_pids = []
         for pid in pids_list:
             pid_exe_path = '/proc/{0}/exe'.format(str(pid))
@@ -174,8 +175,9 @@ class ResourceAlerter:
             except (FileNotFoundError, AssertionError):  # Link doesn't exist
                 pass  # Link doesn't exist = kernel pid = do not add to list
         info_logger.info('Finished filtering kernel PIDs')
+        str_nk_pids = [str(pid) for pid in non_kernel_pids]
         debug_logger.debug(
-                'Filtered PID List: {0}'.format(', '.join(non_kernel_pids)))
+                'Filtered PID List: {0}'.format(', '.join(str_nk_pids)))
         return non_kernel_pids
 
     @staticmethod

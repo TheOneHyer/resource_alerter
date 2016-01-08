@@ -109,8 +109,7 @@ class DaemonRunner:
         self.daemon_context = DaemonContext()
         self.daemon_context.stdin = open(app.stdin_path, 'rt')
         self.daemon_context.stdout = open(app.stdout_path, 'w+t')
-        self.daemon_context.stderr = open(
-                app.stderr_path, 'w+t')  # TODO: test this edit
+        self.daemon_context.stderr = open(app.stderr_path, 'w+t')
 
         self.pidfile = None
         if app.pidfile_path is not None:
