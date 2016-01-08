@@ -41,13 +41,13 @@ Copyright:
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from resource_alerter.daemon import runner
 import difflib
 import logging
 import logging.config
 import os
 from pkg_resources import resource_stream
 import psutil
+from ra_daemon import runner
 import shutil
 import subprocess
 import sys
@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b6'
+__version__ = '0.0.0b7'
 
 
 class ResourceAlerter:
