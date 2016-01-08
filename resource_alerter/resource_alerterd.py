@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b12'
+__version__ = '0.0.0b13'
 
 
 class ResourceAlerter:
@@ -262,6 +262,8 @@ class ResourceAlerter:
             info_logger.info('PIDs are highly similar to last check and '
                              'CPU-check override is not active: skipping CPU '
                              'usage check')
+            self.last_cpu_check = self.start_time
+            debug_logger.debug('Reset last CPU check time')
             return  # Exit CPU usage check silently
 
         # Determine if sufficient time has past since last CPU check to
@@ -402,6 +404,8 @@ class ResourceAlerter:
             info_logger.info('PIDs are highly similar to last check and '
                              'IO-check override is not active: skipping IO '
                              'usage check')
+            self.last_io_check = self.start_time
+            debug_logger.debug('Reset last IO check time')
             return  # Exit IO usage check silently
 
         # Determine if sufficient time has past since last IO check to
@@ -569,6 +573,8 @@ class ResourceAlerter:
             info_logger.info('PIDs are highly similar to last check and '
                              'RAM-check override is not active: skipping RAM '
                              'usage check')
+            self.last_ram_check = self.start_time
+            debug_logger.debug('Reset last RAM check time')
             return  # Exit RAM usage check silently
 
         # Determine if sufficient time has past since last RAM check to
