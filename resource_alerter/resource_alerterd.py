@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b11'
+__version__ = '0.0.0b12'
 
 
 class ResourceAlerter:
@@ -250,7 +250,7 @@ class ResourceAlerter:
             debug_logger.debug('CPU override delay time: {0} sec'.format(
                     str(self.config['cpu_override_delay'])))
             debug_logger.debug('Time since last CPU-check override: '
-                               '{0} s'.format(str(delta_override_time)))
+                               '{0} sec'.format(str(delta_override_time)))
             if delta_override_time >= self.config['cpu_override_delay']:
                 override = True
                 info_logger.info('Time since last override is greater than '
@@ -364,9 +364,9 @@ class ResourceAlerter:
                                      'Critical Threshold: skipping '
                                      'broadcast')
 
-            # Reset time since last check
-            self.last_cpu_check = self.start_time
-            debug_logger.debug('Reset last CPU check time')
+        # Reset time since last check
+        self.last_cpu_check = self.start_time
+        debug_logger.debug('Reset last CPU check time')
 
     def io_check(self):
         """Checks IO Wait, logs and/or broadcasts high usage
@@ -502,9 +502,9 @@ class ResourceAlerter:
                                      'Critical Threshold: skipping '
                                      'broadcast')
 
-            # Reset time since last check
-            self.last_io_check = self.start_time
-            debug_logger.debug('Reset last IO check time')
+        # Reset time since last check
+        self.last_io_check = self.start_time
+        debug_logger.debug('Reset last IO check time')
 
     def pids_same_test(self):
         """Determine how similar current PIDs are to last resource check
@@ -669,9 +669,9 @@ class ResourceAlerter:
                                      'Critical Threshold: skipping '
                                      'broadcast')
 
-            # Reset time since last check
-            self.last_ram_check = self.start_time
-            debug_logger.debug('Reset last RAM check time')
+        # Reset time since last check
+        self.last_ram_check = self.start_time
+        debug_logger.debug('Reset last RAM check time')
 
     def run(self):
         """Main loop for daemon
