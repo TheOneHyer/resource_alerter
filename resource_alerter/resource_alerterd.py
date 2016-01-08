@@ -41,7 +41,7 @@ Copyright:
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from daemon import runner
+from resource_alerter.daemon import runner
 import difflib
 import logging
 import logging.config
