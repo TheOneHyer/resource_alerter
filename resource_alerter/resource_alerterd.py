@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b9'
+__version__ = '0.0.0b10'
 
 
 class ResourceAlerter:
@@ -164,8 +164,6 @@ class ResourceAlerter:
         """
 
         info_logger.info('Filtering out kernel PIDs')
-        str_pids = [str(pid) for pid in pids_list]
-        debug_logger.debug('Raw PID List: {0}'.format(', '.join(str_pids)))
         non_kernel_pids = []
         for pid in pids_list:
             pid_exe_path = '/proc/{0}/exe'.format(str(pid))
@@ -175,9 +173,6 @@ class ResourceAlerter:
             except (FileNotFoundError, AssertionError):  # Link doesn't exist
                 pass  # Link doesn't exist = kernel pid = do not add to list
         info_logger.info('Finished filtering kernel PIDs')
-        str_nk_pids = [str(pid) for pid in non_kernel_pids]
-        debug_logger.debug(
-                'Filtered PID List: {0}'.format(', '.join(str_nk_pids)))
         return non_kernel_pids
 
     @staticmethod
@@ -246,7 +241,7 @@ class ResourceAlerter:
         override = False
         if self.last_cpu_override is None:
             override = True
-            self.last_cpu_override = self.start_time  # TODO: add to all
+            self.last_cpu_override = self.start_time
             info_logger.info('CPU usage has never been checked by this '
                              'instance of resource_alerterd: CPU-check '
                              'override activated')
@@ -272,9 +267,10 @@ class ResourceAlerter:
         # Determine if sufficient time has past since last CPU check to
         # justify checking CPU usage now
         check_cpu = False
-        debug_logger.debug('Calculating time since last CPU check')
+        info_logger.info('Calculating time since last CPU check')
         if self.last_cpu_check is None:
             check_cpu = True
+            self.last_cpu_check = self.start_time
             info_logger.info('CPU usage has never been checked by this '
                              'instance of resource_alerterd: checking CPU '
                              'usage')
@@ -306,16 +302,16 @@ class ResourceAlerter:
         if check_cpu:
             info_logger.info('Determining CPU usage')
             cpu_usage = psutil.cpu_percent()
-            debug_logger.debug('CPU Usage: {0}%'.format(str(cpu_usage)))
+            info_logger.info('CPU Usage: {0}%'.format(str(cpu_usage)))
 
             # See if CPU usage is stable
-            debug_logger.debug('Determining if CPU usage has changed '
-                               'significantly since last broadcast')
+            info_logger.info('Determining if CPU usage has changed '
+                             'significantly since last broadcast')
             if self.stable_cpu_ref is None:
                 stable = False
-                debug_logger.debug('CPU usage has never been checked by this '
-                                   'instance of resource_alerted: '
-                                   'broadcasting enabled')
+                info_logger.info('CPU usage has never been checked by this '
+                                 'instance of resource_alerted: '
+                                 'broadcasting enabled')
             elif override:
                 stable = False
                 info_logger.info('CPU-check override active: broadcasting '
@@ -326,13 +322,13 @@ class ResourceAlerter:
                         current_state=cpu_usage,
                         stable_state=self.stable_cpu_ref)
                 if not stable:
-                    debug_logger.debug('CPU usage has changed significantly '
-                                       'since last broadcast: broadcasting '
-                                       'enabled')
+                    info_logger.info('CPU usage has changed significantly '
+                                     'since last broadcast: broadcasting '
+                                     'enabled')
                 else:
-                    debug_logger.debug('CPU usage has not changed '
-                                       'significantly since last broadcast: '
-                                       'broadcasting disabled')
+                    info_logger.info('CPU usage has not changed '
+                                     'significantly since last broadcast: '
+                                     'broadcasting disabled')
 
             # Skip logging/broadcast if CPU usage is stable,
             # log/broadcast and reset reference point if not
@@ -385,6 +381,7 @@ class ResourceAlerter:
         override = False
         if self.last_io_override is None:
             override = True
+            self.last_io_override = self.start_time
             info_logger.info('IO usage has never been checked by this '
                              'instance of resource_alerterd: IO-check '
                              'override activated')
@@ -410,9 +407,10 @@ class ResourceAlerter:
         # Determine if sufficient time has past since last IO check to
         # justify checking IO usage now
         check_io = False
-        debug_logger.debug('Calculating time since last IO usage')
+        info_logger.info('Calculating time since last IO usage')
         if self.last_io_check is None:
             check_io = True
+            self.last_io_check = self.start_time
             info_logger.info('IO usage has never been checked by this '
                              'instance of resource_alerterd: checking IO '
                              'usage')
@@ -442,16 +440,16 @@ class ResourceAlerter:
         if check_io:
             info_logger.info('Determining IO usage')
             io_usage = psutil.cpu_times().iowait / self.io_max
-            debug_logger.debug('IO Usage: {0}%'.format(str(io_usage)))
+            info_logger.info('IO Usage: {0}%'.format(str(io_usage)))
 
             # See if IO usage is stable
-            debug_logger.debug('Determining if IO usage has changed '
-                               'significantly since last broadcast')
+            info_logger.info('Determining if IO usage has changed '
+                             'significantly since last broadcast')
             if self.stable_io_ref is None:
                 stable = False
-                debug_logger.debug('IO usage has never been checked by this '
-                                   'instance of resource_alerted: '
-                                   'broadcasting enabled')
+                info_logger.info('IO usage has never been checked by this '
+                                 'instance of resource_alerted: '
+                                 'broadcasting enabled')
             elif override:
                 stable = False
                 info_logger.info('IO-check override active: broadcasting '
@@ -462,13 +460,13 @@ class ResourceAlerter:
                         current_state=io_usage,
                         stable_state=self.stable_io_ref)
                 if not stable:
-                    debug_logger.debug('IO usage has changed significantly '
-                                       'since last broadcast: broadcasting '
-                                       'enabled')
+                    info_logger.info('IO usage has changed significantly '
+                                     'since last broadcast: broadcasting '
+                                     'enabled')
                 else:
-                    debug_logger.debug('IO usage has not changed '
-                                       'significantly since last broadcast: '
-                                       'broadcasting disabled')
+                    info_logger.info('IO usage has not changed '
+                                     'significantly since last broadcast: '
+                                     'broadcasting disabled')
 
             # Skip logging/broadcast if IO usage is stable,
             # log/broadcast and reset reference point if not
@@ -549,6 +547,7 @@ class ResourceAlerter:
         override = False
         if self.last_ram_override is None:
             override = True
+            self.last_ram_override = self.start_time
             info_logger.info('RAM usage has never been checked by this '
                              'instance of resource_alerterd: RAM-check '
                              'override activated')
@@ -574,9 +573,10 @@ class ResourceAlerter:
         # Determine if sufficient time has past since last RAM check to
         # justify checking RAM usage now
         check_ram = False
-        debug_logger.debug('Calculating time since last RAM check')
+        info_logger.info('Calculating time since last RAM check')
         if self.last_ram_check is None:
             check_ram = True
+            self.last_ram_check = self.start_time
             info_logger.info('RAM usage has never been checked by this '
                              'instance of resource_alerterd: checking RAM '
                              'usage')
@@ -606,16 +606,16 @@ class ResourceAlerter:
         if check_ram:
             info_logger.info('Determining RAM usage')
             ram_usage = psutil.virtual_memory().percent
-            debug_logger.debug('RAM Usage: {0}%'.format(str(ram_usage)))
+            info_logger.info('RAM Usage: {0}%'.format(str(ram_usage)))
 
             # See if CPU usage is stable
-            debug_logger.debug('Determining if RAM usage has changed '
-                               'significantly since last broadcast')
+            info_logger.info('Determining if RAM usage has changed '
+                             'significantly since last broadcast')
             if self.stable_ram_ref is None:
                 stable = False
-                debug_logger.debug('RAM usage has never been checked by this '
-                                   'instance of resource_alerted: '
-                                   'broadcasting enabled')
+                info_logger.info('RAM usage has never been checked by this '
+                                 'instance of resource_alerted: '
+                                 'broadcasting enabled')
             elif override:
                 stable = False
                 info_logger.info('RAM-check override active: broadcasting '
@@ -626,13 +626,13 @@ class ResourceAlerter:
                         current_state=ram_usage,
                         stable_state=self.stable_ram_ref)
                 if not stable:
-                    debug_logger.debug('RAM usage has changed significantly '
-                                       'since last broadcast: broadcasting '
-                                       'enabled')
+                    info_logger.info('RAM usage has changed significantly '
+                                     'since last broadcast: broadcasting '
+                                     'enabled')
                 else:
-                    debug_logger.debug('RAM usage has not changed '
-                                       'significantly since last broadcast: '
-                                       'broadcasting disabled')
+                    info_logger.info('RAM usage has not changed '
+                                     'significantly since last broadcast: '
+                                     'broadcasting disabled')
 
             # Skip logging/broadcast if RAM usage is stable,
             # log/broadcast and reset reference point if not
@@ -715,9 +715,9 @@ class ResourceAlerter:
         next_resource_check = min(next_cpu_check,
                                   next_io_check,
                                   next_ram_check)
-        sleep_time = next_resource_check - time.time()
+        sleep_time = float(next_resource_check - time.time())
         sleep_time = 0 if sleep_time < 0 else sleep_time  # Avoid negatives
-        info_logger.info('Sleeping for {0} sec'.format(sleep_time))
+        info_logger.info('Sleeping for {0} sec'.format(str(sleep_time)))
         return sleep_time
 
 

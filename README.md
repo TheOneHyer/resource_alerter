@@ -7,6 +7,15 @@ resource_alerter is package containing two simple to use scripts to create
 and run resource_alerted: a Python daemon for Unix-like systems that monitors
 system resource usage and alerts users to high usage.
 
+ra_daemon
+---------
+
+A quick note: the package ra_daemon is just python-daemon v2.10 
+copied-and-pasted with a single error fixed. This error prevents 
+resource_alerterd.py from daemon-izing. I have emailed the developers of 
+python-daemon concerning the issue. Once they fix it, I will delete this 
+package and just import python-daemon again.
+
 Quick Start
 -----------
 
