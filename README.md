@@ -45,9 +45,9 @@ whether or not a high usage broadcast needs to be made in Step 10.
 
 ###Algorithm
 
-> 1. Read in logging configuration file
+> 1. Read and parse logging configuration file
 > 2. Create loggers
-> 3. Read in daemon configuration file
+> 3. Read and parse daemon configuration file
 > 4. Initialize daemon
 > 5. See if 'wall' is available for broadcasts
 > 6. Calculate max IO Wait as 100.0 / # of cores
