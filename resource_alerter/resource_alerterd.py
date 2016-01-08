@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b5'
+__version__ = '0.0.0b6'
 
 
 class ResourceAlerter:
@@ -721,15 +721,13 @@ class ResourceAlerter:
 if __name__ == '__main__':
     # Parse configuration file and instantiate class
     config_file = resource_stream('resource_alerter', 'resource_alerterd.conf')
-    with open(config_file, 'rU') as config_handle:
-        config_dict = yaml.load(config_handle)
+    config_dict = yaml.load(config_file)
     resource_alerter = ResourceAlerter(config_dict)
 
     # Parse logging config file and create loggers
     log_config_file = resource_stream('resource_alerter',
                                       'resource_alerterd.logging.conf')
-    with open(log_config_file, 'rU') as config_handle:
-        logging_config_dict = yaml.load(config_handle)
+    logging_config_dict = yaml.load(log_config_file)
     logging.config.dictConfig(logging_config_dict)
     debug_logger = logging.getLogger('debug_logger')
     info_logger = logging.getLogger('info_logger')
