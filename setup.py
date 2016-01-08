@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='resource_alerter',
-      version='0.0.0b19',
+      version='0.0.0b20',
       description='monitors system resources and alerts users to high usage',
       classifiers=[
           'Development Status :: 4 - Beta',

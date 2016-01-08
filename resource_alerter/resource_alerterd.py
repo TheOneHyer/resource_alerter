@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b10'
+__version__ = '0.0.0b11'
 
 
 class ResourceAlerter:
@@ -360,9 +360,9 @@ class ResourceAlerter:
                         debug_logger.debug('Reset last CPU-check override '
                                            'time')
                 else:
-                    debug_logger.debug('CPU usage is not above Warning or '
-                                       'Critical Threshold: skipping '
-                                       'broadcast')
+                    info_logger.info('CPU usage is not above Warning or '
+                                     'Critical Threshold: skipping '
+                                     'broadcast')
 
             # Reset time since last check
             self.last_cpu_check = self.start_time
@@ -498,9 +498,9 @@ class ResourceAlerter:
                         debug_logger.debug('Reset last IO-check override '
                                            'time')
                 else:
-                    debug_logger.debug('IO usage is not above Warning or '
-                                       'Critical Threshold: skipping '
-                                       'broadcast')
+                    info_logger.info('IO usage is not above Warning or '
+                                     'Critical Threshold: skipping '
+                                     'broadcast')
 
             # Reset time since last check
             self.last_io_check = self.start_time
@@ -516,8 +516,9 @@ class ResourceAlerter:
         new_pid_list = self.non_kernel_pids(psutil.pids())
         info_logger.info('Comparing similarity in PID lists since last '
                          'resource check')
-        compare_pids = difflib.SequenceMatcher(new_pid_list,
-                                               self.old_pid_list)
+        compare_pids = difflib.SequenceMatcher(None,
+                                               self.old_pid_list,
+                                               new_pid_list)
         pids_similarity = compare_pids.ratio() * 100.0
         debug_logger.debug('PID lists similarity: {0}%'.format(str(
                 pids_similarity)))
@@ -664,9 +665,9 @@ class ResourceAlerter:
                         debug_logger.debug('Reset last RAM-check override '
                                            'time')
                 else:
-                    debug_logger.debug('RAM usage is not above Warning or '
-                                       'Critical Threshold: skipping '
-                                       'broadcast')
+                    info_logger.info('RAM usage is not above Warning or '
+                                     'Critical Threshold: skipping '
+                                     'broadcast')
 
             # Reset time since last check
             self.last_ram_check = self.start_time
