@@ -59,7 +59,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0b8'
+__version__ = '0.0.0b9'
 
 
 class ResourceAlerter:
@@ -246,6 +246,7 @@ class ResourceAlerter:
         override = False
         if self.last_cpu_override is None:
             override = True
+            self.last_cpu_override = self.start_time  # TODO: add to all
             info_logger.info('CPU usage has never been checked by this '
                              'instance of resource_alerterd: CPU-check '
                              'override activated')
