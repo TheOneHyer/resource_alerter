@@ -1,7 +1,10 @@
 resource_alerter
 ================
 
-!!!WARNING!!!: resource_alerter is undergoing testing and is not stable
+Version: 0.0.0rc1
+
+resource_alerter has passed most bug tests and it's time for field testing!
+If you use resource_alerter, let me know if yo uahve any problems.
 
 resource_alerter is package containing two simple to use scripts to create
 and run resource_alerted: a Python daemon for Unix-like systems that monitors
