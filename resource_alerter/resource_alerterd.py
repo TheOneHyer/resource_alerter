@@ -206,6 +206,8 @@ class ResourceAlerter:
                             '"wall"'.format(error)
             error_logger.error(error_message)
 
+    # TODO: Add static which method from Python 3
+
     def check_wall(self):
         """See if daemon can/should broadcast high usage messages via 'wall'
 
@@ -370,6 +372,7 @@ class ResourceAlerter:
         self.last_cpu_check = self.start_time
         debug_logger.debug('Reset last CPU check time')
 
+    # TODO: IO Wait is not useful, find better metric or delete
     def io_check(self):
         """Checks IO Wait, logs and/or broadcasts high usage
 
@@ -727,7 +730,6 @@ class ResourceAlerter:
         info_logger.info('Sleeping for {0} sec'.format(str(sleep_time)))
         return sleep_time
 
-
 if __name__ == '__main__':
     # Parse configuration file and instantiate class
     config_file = resource_stream('resource_alerter', 'resource_alerterd.conf')
@@ -746,6 +748,8 @@ if __name__ == '__main__':
     critical_logger = logging.getLogger('critical_logger')
     loggers = [debug_logger, info_logger, warning_logger, error_logger,
                critical_logger]
+
+    # TODO: modify this section to make systemd compatible, probably an arg
 
     # Ensure that logging files are available after daemon-ization
     files_to_preserve = []
