@@ -24,7 +24,7 @@ Copyright:
 from setuptools import setup, find_packages
 
 setup(name='resource_alerter',
-      version='0.0.1rc2',
+      version='0.0.1rc3',
       description='monitors system resources and alerts users to high usage',
       classifiers=[
           'Development Status :: 4 - Beta',
