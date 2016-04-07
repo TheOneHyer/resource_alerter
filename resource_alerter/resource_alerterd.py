@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-"""Monitors CPUand RAM usage, logs/broadcasts high usage
+"""Monitors CPU and RAM usage, logs/broadcasts high usage
 
 Usage:
 
@@ -62,7 +62,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0rc3'
+__version__ = '0.0.0rc4'
 
 
 class ResourceAlerter:
@@ -169,7 +169,7 @@ class ResourceAlerter:
             try:
                 assert bool(os.readlink(pid_exe_path)) is True  # Link exists
                 non_kernel_pids.append(pid)  # Link exists = non-kernel pid
-            except (FileNotFoundError, AssertionError):  # Link doesn't exist
+            except (OSError, AssertionError):  # Link doesn't exist
                 pass  # Link doesn't exist = kernel pid = do not add to list
         info_logger.info('Finished filtering kernel PIDs')
         return non_kernel_pids
@@ -178,7 +178,7 @@ class ResourceAlerter:
     def wall(resource=None, level=None, usage=None):
         """Attempts to broadcast wall message and logs error if it cannot
 
-        :param resource: resource type ['CPU', 'RAM', 'IO']
+        :param resource: resource type ['CPU', 'RAM']
         :type resource: str
 
         :param level: usage level of resource ['Warning', 'Critical']
