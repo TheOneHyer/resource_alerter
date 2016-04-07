@@ -1,31 +1,35 @@
 #! /usr/bin/env python
 
-"""Monitors CPU, RAM, and IO Wait and warns of/broadcasts high usage
+"""Monitors CPUand RAM usage, logs/broadcasts high usage
 
 Usage:
 
-    resource_alerterd.py {start | stop | restart}
+    resource_alerterd.py [--systemd] { start | stop | restart }
 
 Synopsis:
 
     resource_alerterd is a Python daemon designed for Unix-like systems. As
     the name, it monitors system resource usage and alerts users to high
-    resource usage. Specifically, resource_alerterd monitors CPU, RAM, and IO
+    resource usage. Specifically, resource_alerterd monitors CPU and RAM
     usage and logs use above specified percentage thresholds. Many aspects
     of the alerting algorithm are customizable in the configuration file.
+    This program should be run with root permissions to function properly.
     See README.md for more details.
 
-Important Notes:
+Arguments:
 
-    1) This process should be run with root permissions to function properly
+    --systemd:  Runs resource_alerterd in systemd-compatibility mode,
+                forking type in systemd unit scripts should be set to 'simple'
 
-    2) Run resource_alerterd_setup.py before starting this daemon for the
-       first time
+    { start | stop | restart }: For all tested cases other than systemd,
+                                resource_alerterd will double fork in order to
+                                daemonize. These three options control the
+                                daemon.
 
 Copyright:
 
     resource_alerted.py monitor resource usage and notifies users of high use
-    Copyright (C) 2015  Alex Hyer
+    Copyright (C) 2016  Alex Hyer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -48,7 +52,6 @@ import os
 from pkg_resources import resource_stream
 import psutil
 from ra_daemon import runner
-import shutil
 import subprocess
 import sys
 import time
@@ -59,7 +62,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0rc1'
+__version__ = '0.0.0rc2'
 
 
 class ResourceAlerter:
@@ -106,11 +109,8 @@ class ResourceAlerter:
         """
 
         self.config = config  # Dictionary from YAML configuration file
-        self.io_max = None  # System dependent max IO percentage
         self.last_cpu_check = None
         self.last_cpu_override = None
-        self.last_io_check = None
-        self.last_io_override = None
         self.last_ram_check = None
         self.last_ram_override = None
         self.pidfile_path = '/var/run/resource_alerterd/resource_alerterd.pid'
@@ -118,7 +118,6 @@ class ResourceAlerter:
         self.pids_same = False  # True if PIDs since last check highly similar
         self.old_pid_list = []  # List of PIDs during last resource check
         self.stable_cpu_ref = None  # CPU usage at last broadcast
-        self.stable_io_ref = None  # IO usage at last broadcast
         self.stable_ram_ref = None  # RAM usage at last broadcast
         self.start_time = None  # Time current resource check began
         self.stdin_path = '/dev/null'  # No STDIN
@@ -206,7 +205,71 @@ class ResourceAlerter:
                             '"wall"'.format(error)
             error_logger.error(error_message)
 
-    # TODO: Add static which method from Python 3
+    # This method is literally just the Python 3.5.1 which function from the
+    # shutil library in order to permit this functionality in Python 2.
+    # Minor changes to style wer made to account for indentation.
+    @staticmethod
+    def which(cmd, mode=os.F_OK | os.X_OK, path=None):
+        """Given a command, mode, and a PATH string, return the path which
+        conforms to the given mode on the PATH, or None if there is no such
+        file.
+
+        `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
+        of os.environ.get("PATH"), or can be overridden with a custom search
+        path.
+        """
+
+        # Check that a given file can be accessed with the correct mode.
+        # Additionally check that `file` is not a directory, as on Windows
+        # directories pass the os.access check.
+        def _access_check(fn, mode):
+            return (os.path.exists(fn) and os.access(fn, mode)
+                    and not os.path.isdir(fn))
+
+        # If we're given a path with a directory part, look it up directly
+        # rather than referring to PATH directories. This includes checking
+        # relative to the current directory, e.g. ./script
+        if os.path.dirname(cmd):
+            if _access_check(cmd, mode):
+                return cmd
+            return None
+
+        if path is None:
+            path = os.environ.get("PATH", os.defpath)
+        if not path:
+            return None
+        path = path.split(os.pathsep)
+
+        if sys.platform == "win32":
+            # The current directory takes precedence on Windows.
+            if not os.curdir in path:
+                path.insert(0, os.curdir)
+            # PATHEXT is necessary to check on Windows.
+            pathext = os.environ.get("PATHEXT", "").split(os.pathsep)
+            # See if the given file matches any of the expected path
+            # extensions. This will allow us to short circuit when given
+            # "python.exe". If it does match, only test that one, otherwise
+            # we have to try others.
+            if any(cmd.lower().endswith(ext.lower()) for ext in
+                   pathext):
+                files = [cmd]
+            else:
+                files = [cmd + ext for ext in pathext]
+        else:
+            # On other platforms you don't have things like PATHEXT to tell you
+            # what file suffixes are executable, so just pass on cmd as-is.
+            files = [cmd]
+
+        seen = set()
+        for dir in path:
+            normdir = os.path.normcase(dir)
+            if not normdir in seen:
+                seen.add(normdir)
+                for thefile in files:
+                    name = os.path.join(dir, thefile)
+                    if _access_check(name, mode):
+                        return name
+        return None
 
     def check_wall(self):
         """See if daemon can/should broadcast high usage messages via 'wall'
@@ -215,7 +278,7 @@ class ResourceAlerter:
         :rtype: N/A
         """
 
-        if bool(shutil.which('wall')):
+        if bool(self.which('wall')):
             debug_logger.debug('Program "wall" found')
             if self.config['critical_wall_message']:
                 self.wall_critical = True
@@ -371,147 +434,6 @@ class ResourceAlerter:
         # Reset time since last check
         self.last_cpu_check = self.start_time
         debug_logger.debug('Reset last CPU check time')
-
-    # TODO: IO Wait is not useful, find better metric or delete
-    def io_check(self):
-        """Checks IO Wait, logs and/or broadcasts high usage
-
-        :return: nothing
-        :rtype: N/A
-        """
-
-        info_logger.info('Determining if IO usage check is needed')
-
-        # Determine if override should be put into effect
-        override = False
-        if self.last_io_override is None:
-            override = True
-            self.last_io_override = self.start_time
-            info_logger.info('IO usage has never been checked by this '
-                             'instance of resource_alerterd: IO-check '
-                             'override activated')
-        else:
-            delta_override_time = self.start_time - self.last_io_override
-            debug_logger.debug('IO override delay time: {0} sec'.format(
-                    str(self.config['io_override_delay'])))
-            debug_logger.debug('Time since last IO-check override: '
-                               '{0} sec'.format(str(delta_override_time)))
-            if delta_override_time >= self.config['io_override_delay']:
-                override = True
-                info_logger.info('Time since last override is greater than '
-                                 'IO override check delay: IO-check '
-                                 'override activated')
-
-        # Skip IO usage check if PID lists are similar and override inactive
-        if not override and self.pids_same:
-            info_logger.info('PIDs are highly similar to last check and '
-                             'IO-check override is not active: skipping IO '
-                             'usage check')
-            self.last_io_check = self.start_time
-            debug_logger.debug('Reset last IO check time')
-            return  # Exit IO usage check silently
-
-        # Determine if sufficient time has past since last IO check to
-        # justify checking IO usage now
-        check_io = False
-        info_logger.info('Calculating time since last IO usage')
-        if self.last_io_check is None:
-            check_io = True
-            self.last_io_check = self.start_time
-            info_logger.info('IO usage has never been checked by this '
-                             'instance of resource_alerterd: checking IO '
-                             'usage')
-        elif override:
-            check_io = True
-            info_logger.info('IO-check override active: checking IO usage')
-        else:
-            delta_check_time = self.start_time - self.last_io_check
-            debug_logger.debug('IO check delay time: {0} sec'.format(
-                    str(self.config['io_check_delay'])))
-            debug_logger.debug(
-                    'Time since last IO check: {0} sec'.format(
-                            str(delta_check_time)))
-            delta_check_ratio = delta_check_time / self.config[
-                'io_check_delay']
-            if delta_check_ratio >= 0.95:
-                check_io = True
-                info_logger.info('Time since last check is close to or '
-                                 'greater than IO check delay time: checking '
-                                 'IO usage')
-            else:
-                info_logger.info('Time since last check is not close to or '
-                                 'greater than delay IO check delay time: '
-                                 'skipping IO usage check')
-
-        # Check IO Wait and log/broadcast high usage
-        if check_io:
-            info_logger.info('Determining IO usage')
-            io_usage = psutil.cpu_times().iowait / self.io_max
-            info_logger.info('IO Usage: {0}%'.format(str(io_usage)))
-
-            # See if IO usage is stable
-            info_logger.info('Determining if IO usage has changed '
-                             'significantly since last broadcast')
-            if self.stable_io_ref is None:
-                stable = False
-                info_logger.info('IO usage has never been checked by this '
-                                 'instance of resource_alerted: '
-                                 'broadcasting enabled')
-            elif override:
-                stable = False
-                info_logger.info('IO-check override active: broadcasting '
-                                 'enabled')
-            else:
-                stable = self.is_stable(
-                        bound_diff=self.config['io_stable_diff'],
-                        current_state=io_usage,
-                        stable_state=self.stable_io_ref)
-                if not stable:
-                    info_logger.info('IO usage has changed significantly '
-                                     'since last broadcast: broadcasting '
-                                     'enabled')
-                else:
-                    info_logger.info('IO usage has not changed '
-                                     'significantly since last broadcast: '
-                                     'broadcasting disabled')
-
-            # Skip logging/broadcast if IO usage is stable,
-            # log/broadcast and reset reference point if not
-            if not stable:
-                if io_usage >= self.config['ram_critical_level']:
-                    self.stable_io_ref = io_usage  # Reset reference
-                    critical_logger.critical(
-                            'IO Usage Critical: {0}%'.format(str(io_usage)))
-                    if self.wall_critical:  # Broadcast critical IO usage
-                        self.wall(resource='IO',
-                                  level='Critical',
-                                  usage=io_usage)
-                    # If broadcast performed under override, reset override
-                    if override:
-                        self.last_ram_override = self.start_time
-                        debug_logger.debug('Reset last IO-check override '
-                                           'time')
-                elif io_usage >= self.config['ram_warning_level']:
-                    self.stable_ram_ref = io_usage  # Reset reference
-                    warning_logger.warning('IO Usage Warning: {0}%'.format(
-                            str(io_usage)))
-                    if self.wall_warning:  # Broadcast IO usage warning
-                        self.wall(resource='IO',
-                                  level='Warning',
-                                  usage=io_usage)
-                    # If broadcast performed under override, reset override
-                    if override:
-                        self.last_ram_override = self.start_time
-                        debug_logger.debug('Reset last IO-check override '
-                                           'time')
-                else:
-                    info_logger.info('IO usage is not above Warning or '
-                                     'Critical Threshold: skipping '
-                                     'broadcast')
-
-        # Reset time since last check
-        self.last_io_check = self.start_time
-        debug_logger.debug('Reset last IO check time')
 
     def pids_same_test(self):
         """Determine how similar current PIDs are to last resource check
@@ -692,9 +614,6 @@ class ResourceAlerter:
         # See if OS has 'wall' command to broadcast resource usage
         self.check_wall()
 
-        # Calculate maximum acceptable IO Wait
-        self.io_max = 100.0 / float(psutil.cpu_count())
-
         # Main daemon
         while True:
             # Pre-resource check necessities
@@ -705,7 +624,6 @@ class ResourceAlerter:
             # Run resource checks
             self.cpu_check()
             self.ram_check()
-            self.io_check()
             info_logger.info('Resource check complete')
 
             # Determine sleep time until next resource check
@@ -720,17 +638,27 @@ class ResourceAlerter:
 
         debug_logger.debug('Calculating time until next resource check')
         next_cpu_check = self.last_cpu_check + config_dict['cpu_check_delay']
-        next_io_check = self.last_io_check + config_dict['io_check_delay']
         next_ram_check = self.last_ram_check + config_dict['ram_check_delay']
         next_resource_check = min(next_cpu_check,
-                                  next_io_check,
                                   next_ram_check)
         sleep_time = float(next_resource_check - time.time())
         sleep_time = 0 if sleep_time < 0 else sleep_time  # Avoid negatives
         info_logger.info('Sleeping for {0} sec'.format(str(sleep_time)))
         return sleep_time
 
+
 if __name__ == '__main__':
+
+    # Test for runtime folder and create if needed
+    runtime_folder = '/var/run/resource_alerterd'
+    if not os.path.isdir(runtime_folder):
+        os.mkdir(runtime_folder)
+
+    # Test for logging folder and create if needed
+    logging_folder = '/var/log/resource_alerter'
+    if not os.path.isdir(logging_folder):
+        os.mkdir(logging_folder)
+
     # Parse configuration file and instantiate class
     config_file = resource_stream('resource_alerter', 'resource_alerterd.conf')
     config_dict = yaml.load(config_file)
@@ -749,19 +677,21 @@ if __name__ == '__main__':
     loggers = [debug_logger, info_logger, warning_logger, error_logger,
                critical_logger]
 
-    # TODO: modify this section to make systemd compatible, probably an arg
+    # Run resource_alerterd in systemd-compatible mode else daemonize
+    if sys.argv[1] == '--systemd':
+        resource_alerter.run()
+    else:
+        # Ensure that logging files are available after daemon-ization
+        files_to_preserve = []
+        for logger in loggers:
+            for i in range(len(logger.handlers)):
+                file_stream = logger.handlers[i].stream
+                if file_stream not in files_to_preserve:
+                    files_to_preserve.append(file_stream)
 
-    # Ensure that logging files are available after daemon-ization
-    files_to_preserve = []
-    for logger in loggers:
-        for i in range(len(logger.handlers)):
-            file_stream = logger.handlers[i].stream
-            if file_stream not in files_to_preserve:
-                files_to_preserve.append(file_stream)
-
-    # Create daemon
-    daemon_runner = runner.DaemonRunner(resource_alerter)
-    daemon_runner.daemon_context.files_preserve = files_to_preserve
-    daemon_runner.do_action()
+        # Create daemon
+        daemon_runner = runner.DaemonRunner(resource_alerter)
+        daemon_runner.daemon_context.files_preserve = files_to_preserve
+        daemon_runner.do_action()
 
     sys.exit(0)

@@ -1,13 +1,13 @@
 resource_alerter
 ================
 
-Version: 0.0.0rc1
+Version: 0.0.0rc2
 
 resource_alerter has passed most bug tests and it's time for field testing!
-If you use resource_alerter, let me know if yo uahve any problems.
+If you use resource_alerter, let me know if you have any problems.
 
-resource_alerter is package containing two simple to use scripts to create
-and run resource_alerted: a Python daemon for Unix-like systems that monitors
+resource_alerter is package containing a simple to use scripts to run 
+resource_alerted: a Python daemon for Unix-like systems that monitors
 system resource usage and alerts users to high usage.
 
 ra_daemon
@@ -24,19 +24,16 @@ Quick Start
 
 > pip install resource_alerter
 >
-> sudo resource_alerter_setup.py --force-yes
->
 > sudo resource_alerterd.py start
-
-*Note: You MUST run the setup script before the daemon. If you do not the 
-daemon will not function and you will get cryptic errors.*
+>
+> sudo resouce_alerterd.py --systemd  # For use with unit scripts in systemd
 
 Synopsis
 --------
 
 As aforementioned, resource_alerterd is a Python daemon for Unix-like systems
 that monitors system resource usage and alerts users to high resource usage.
-More specifically, resource_alerted monitors CPU, RAM, and IO Wait and logs 
+More specifically, resource_alerted monitors CPU and RAM and logs 
 resource use if it crosses a "warning" and/or "critical" threshold. The 
 daemon is also capable of sending out a broadcast via the "wall" program
 if present. Obviously there are a few problems with sending out a broadcast
@@ -62,11 +59,10 @@ whether or not a high usage broadcast needs to be made in Step 10.
 > 3. Read and parse daemon configuration file
 > 4. Initialize daemon
 > 5. See if 'wall' is available for broadcasts
-> 6. Calculate max IO Wait as 100.0 / # of cores
 > 7. Start infinite loop
 > 8. Calculate similarity to PID list of last resource check
 > 9. Reset last PID list w/ current one
-> 10. for RESOURCE in CPU, RAM, IO Wait:
+> 10. for RESOURCE in CPU, RAM:
 >   * Calculate time since RESOURCE override last active, activate if too 
 > long
 >   * Skip RESOURCE check if PID similar and override inactive
@@ -147,33 +143,6 @@ below:
     system doesn't have the program 'wall', critical resource use will only 
     be logged.
     
-* io_check_delay:
-
-    Approximate time between IO usage checks in seconds.
-    
-* io_critical_level:
-
-    Lower IO usage percent threshold for declaring IO usage critical,
-    i.e. IO usage above this value is deemed critical.
-    
-* io_override_delay:
-
-    Minimum amount of time between IO-usage override activates in seconds. 
-    Essentially, high IO usage will trigger a broadcast roughly at least as 
-    often as this value.
-    
-* io_stable_diff:
-
-    Max *PERCENTAGE POINT* (not percent) difference between last IO usage 
-    broadcast and current IO usage before IO usage is declared unstable. 
-    IO usage must be unstable to enable broadcasting unless the IO-usage 
-    override is active.
-    
-* io_warning_level:
-
-    Lower IO usage percent threshold for declaring IO usage warning,
-    i.e. IO usage above this value is deemed worth broadcasting a warning.
-    
 * min_pid_same:
 
     Minimum percent similarity permitted between current Process IDs and 
@@ -231,11 +200,6 @@ disable the filters:
 * While you cannot directly disable checking a specific resource, you can  
 effectively disable a resource's broadcasts, by setting 
 [resource]_warning_level and [resource]_critical_level to "100.1" or higher.
-*Note: this does not guarantee that the IO resource check won't broadcast 
-(though it'll mostly do the job) because the IO max usage is not 100% IO Wait
-but rather (100.0 / # of cores), setting the IO warning and critical levels to
-(100.0 * # of cores + 0.1) will guarantee that the IO usage broadcast is 
-disabled.*
 
 * To save on resource use by the daemon or high log turnover, tune the 
 [resource]_check_delay and [resource]_override_delay to fit your preferences.
@@ -244,14 +208,6 @@ Important Notes
 ---------------
 
 * It is highly advised that resource_alerted is started at boot. 
-Accomplishing this is often unique to your operating system but typically 
-consists of adding the lines "resource_alerterd_setup.py --force-yes" and 
-"resource_alerterd" at the end of a specific file.
+Accomplishing this is often unique to your operating system.
 
-* You must run "resource_alerterd_setup.py" before starting the daemon.
-
-* You must run both scripts in this package as root for proper functionality
-
-* IO usage check measures IO Wait, not read/write rate.
-
-* IO Wait is not out of 100% but rather (100.0 / # of cores)%.
+* You must run resource_alerterd.py as root for proper functionality.
