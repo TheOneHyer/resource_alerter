@@ -211,3 +211,9 @@ Important Notes
 Accomplishing this is often unique to your operating system.
 
 * You must run resource_alerterd.py as root for proper functionality.
+
+Unit File
+---------
+
+An example unit file for use with systemd that should work on most systems
+is included in this package: [resource_alerterd](resource_alerterd).

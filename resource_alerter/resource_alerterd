@@ -1,0 +1,11 @@
+[Unit]
+Description=Resource Alerter
+After=syslog.target
+
+[Service]
+Type=simple
+PIDFile=/var/run/resource_alerterd/resource_alerterd.pid
+ExecStart=/usr/bin/resource_alerterd.py --systemd
+
+[Install]
+WantedBy=multi-user.target

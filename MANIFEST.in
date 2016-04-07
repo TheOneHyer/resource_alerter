@@ -1,1 +1,2 @@
 include resource_alerter/*.conf
+include resource_alerter/resource_alerterd
