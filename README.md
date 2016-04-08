@@ -1,7 +1,7 @@
 resource_alerter
 ================
 
-Version: 0.0.0rc4
+Version: 0.0.0rc6
 
 resource_alerter has passed most bug tests and it's time for field testing!
 If you use resource_alerter, let me know if you have any problems.

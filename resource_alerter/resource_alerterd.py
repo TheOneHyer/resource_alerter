@@ -62,7 +62,7 @@ __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
 __status__ = 'Development'
-__version__ = '0.0.0rc5'
+__version__ = '0.0.0rc6'
 
 
 class ResourceAlerter:
@@ -102,7 +102,7 @@ class ResourceAlerter:
         """Initializes many essential daemon-wide runt-time variables
 
         :param config: configuration file as dictionary
-        :type: dict
+        :type config: dict
 
         :return: nothing
         :rtype: N/A
@@ -191,7 +191,7 @@ class ResourceAlerter:
         :rtype: N/A
         """
 
-        message = '{0} Usage {1}: {2}\nIt is recommended that you do not ' \
+        message = '{0} Usage {1}: {2}%\nIt is recommended that you do not ' \
                   'start any {0} intensive processes at this ' \
                   'time.'.format(resource, level, str(usage))
         try:
@@ -376,8 +376,7 @@ class ResourceAlerter:
                              'significantly since last broadcast')
             if self.stable_cpu_ref is None:
                 stable = False
-                info_logger.info('CPU usage has never been checked by this '
-                                 'instance of resource_alerted: '
+                info_logger.info('CPU stability unknown: '
                                  'broadcasting enabled')
             elif override:
                 stable = False
@@ -545,8 +544,7 @@ class ResourceAlerter:
                              'significantly since last broadcast')
             if self.stable_ram_ref is None:
                 stable = False
-                info_logger.info('RAM usage has never been checked by this '
-                                 'instance of resource_alerted: '
+                info_logger.info('RAM stability unknown: '
                                  'broadcasting enabled')
             elif override:
                 stable = False
