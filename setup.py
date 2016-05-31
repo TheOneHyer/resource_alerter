@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
 
 """Installs resource_alerter package
 
 Copyright:
 
     setup.py installs resource_alerter package
-    Copyright (C) 2016  Alex Hyer
+    Copyright (C) 2015  Alex Hyer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,10 +24,10 @@ Copyright:
 from setuptools import setup, find_packages
 
 setup(name='resource_alerter',
-      version='0.0.1rc6',
+      version='1.0.0',
       description='monitors system resources and alerts users to high usage',
       classifiers=[
-          'Development Status :: 4 - Beta',
+          'Development Status :: 5 - Production/Stable',
           'Environment :: No Input/Output (Daemon)',
           'Intended Audience :: System Administrators',
           'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
@@ -41,7 +41,7 @@ setup(name='resource_alerter',
       keywords='daemon resource alerter monitor monitoring log logging',
       url='https://github.com/TheOneHyer/resource_alerter',
       download_url='https://github.com/TheOneHyer/resource_alerter/tarball/'
-                    + '0.0.1rc6',
+                    + '1.0.0',
       author='Alex Hyer',
       author_email='theonehyer@gmail.com',
       license='GPLv3',

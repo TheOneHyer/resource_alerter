@@ -29,7 +29,7 @@ Arguments:
 Copyright:
 
     resource_alerted.py monitor resource usage and notifies users of high use
-    Copyright (C) 2016  Alex Hyer
+    Copyright (C) 2015  Alex Hyer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -61,52 +61,58 @@ __author__ = 'Alex Hyer'
 __email__ = 'theonehyer@gmail.com'
 __license__ = 'GPLv3'
 __maintainer__ = 'Alex Hyer'
-__status__ = 'Development'
-__version__ = '0.0.0rc6'
+__status__ = 'Production'
+__version__ = '1.0.0'
 
 
 class ResourceAlerter:
     """Daemon-ized, checks various resource usage and alerts users
 
     This class is, for most intents and purposes, the actual run time process
-    of resource_alerterd. In brief, this class monitors CPU, RAM, and IO
-    usage and then alerts users to high usage of these resources.
+    of resource_alerterd. In brief, this class monitors CPU and RAM
+    usage and then alerts users to high usage of these resources. High
+    resource usage is both logged as per resource_alerterd.logging.conf
+    and is broadcasted via the program 'wall' if wall is available and
+    resource_alerterd is configured to use wall as per resource_alerterd.conf.
 
-    Function Summaries
-    ------------------
+    Attributes:
+        config (dict): Program configuration options
 
-    __init__: initializes run-time variables
+        last_cpu_check (float): Seconds since CPU usage last checked
 
-    is_stable: static, determine if a given resource usage is stable
+        last_cpu_override (float): Seconds since last CPU override check
 
-    non_kernel_pids: static, filter out kernel PIDs from a PID list
+        last_ram_check (float): Seconds since RAM usage last checked
 
-    wall: static, script and broadcast resource usage alert via 'wall'
+        last_ram_override (float): Seconds since last RAM override check
 
-    check_wall: determine if daemon can use 'wall'
+        pidfile_path (str): File path to PID file
 
-    cpu_check: check CPU usage and log/broadcast high usage
+        pidfile_timeout (int): Max time between successful acces to PID file
+            before exiting
 
-    io_check: check IO usage and log/broadcast high usage
+        pids_same (bool): True if PIDs of current resource usage check are
+        highly similar to the last resource check as defined in in config
 
-    pids_same_test: determine if PIDs have changed since last resource check
+        old_pid_list (list): List of non-kernal PIDs from last resource usage
+            check
 
-    ram_check: check RAM usage and log/broadcast high usage
+        stable_cpu_ref (float): CPU usage of last high CPU usage broadcast
 
-    run: main loop of daemon, calls other functions listed here
+        stable_ram_ref (float): RAM usage of last high RAM usage broadcast
 
-    sleep_time: determine how long daemon should sleep between resource checks
+        start_time (float): Start of current resource check in seconds since
+            Epoch (beginning of time)
+
+        stdin_path (str): File path for STDIN
+
+        stdierr_path (str): File path for STDERR
+
+        stdout_path (str): File path for STDOUT
     """
 
     def __init__(self, config):
-        """Initializes many essential daemon-wide runt-time variables
-
-        :param config: configuration file as dictionary
-        :type config: dict
-
-        :return: nothing
-        :rtype: N/A
-        """
+        """Initializes many essential daemon-wide run-time variables"""
 
         self.config = config  # Dictionary from YAML configuration file
         self.last_cpu_check = None
@@ -115,11 +121,11 @@ class ResourceAlerter:
         self.last_ram_override = None
         self.pidfile_path = '/var/run/resource_alerterd/resource_alerterd.pid'
         self.pidfile_timeout = 5
-        self.pids_same = False  # True if PIDs since last check highly similar
-        self.old_pid_list = []  # List of PIDs during last resource check
-        self.stable_cpu_ref = None  # CPU usage at last broadcast
-        self.stable_ram_ref = None  # RAM usage at last broadcast
-        self.start_time = None  # Time current resource check began
+        self.pids_same = False
+        self.old_pid_list = []
+        self.stable_cpu_ref = None
+        self.stable_ram_ref = None
+        self.start_time = None
         self.stdin_path = '/dev/null'  # No STDIN
         self.stderr_path = '/dev/null'  # No STDERR
         self.stdout_path = '/dev/null'  # No STDOUT
@@ -131,35 +137,36 @@ class ResourceAlerter:
                   stable_state=None):
         """Determines if resource usage is stable or not
 
-        :param bound_diff: difference from steady state before unstable
-        :type bound_diff: float
+        Args:
+            bound_diff (float): Max difference between stable_state and
+                current_state considered stable
 
-        :param current_state: current resource usage
-        :type current_state: float
+            current_state (float): Current resource usage
 
-        :param stable_state: reference point to determine stability
-        :type stable_state: float
+            stable_state (float): Resource usage of last high resource usage
+                broadcastpoint to determine stability
 
-        :return: True if resource is table else False
-        :rtype: bool
+        Returns:
+            bool: True if abs(stable_state - current_state) > bound_diff,
+                else False, i.e. True if resource usage is stable else False
         """
 
         lower_bound = stable_state - bound_diff
         upper_bound = stable_state + bound_diff
         if current_state < lower_bound or current_state > upper_bound:
-            return False  # Unstable
+            return False
         else:
-            return True  # Stable
+            return True
 
     @staticmethod
     def non_kernel_pids(pids_list):
         """Filter out kernel processes from a list of process IDs
 
-        :param pids_list: list of pids
-        :type pids_list: list
+        Args:
+            pids_list (list): List of PIDs
 
-        :return: non-kernel pids
-        :rtype: list
+        Returns:
+            list: List of non-kernal PIDs
         """
 
         info_logger.info('Filtering out kernel PIDs')
@@ -178,17 +185,13 @@ class ResourceAlerter:
     def wall(resource=None, level=None, usage=None):
         """Attempts to broadcast wall message and logs error if it cannot
 
-        :param resource: resource type ['CPU', 'RAM']
-        :type resource: str
+        Args:
+            resource (str): Resource to broadcast hig usage of
 
-        :param level: usage level of resource ['Warning', 'Critical']
-        :type level: str
+            level (str): Level of urgency for high resource usage, i.e.
+                'Warning,' 'Critical,' etc.
 
-        :param usage: resource usage quantity
-        :type usage: str, int, or float
-
-        :return: nothing
-        :rtype: N/A
+            usage (float): Current resource usage, converted to str
         """
 
         message = '{0} Usage {1}: {2}%\nIt is recommended that you do not ' \
@@ -274,8 +277,8 @@ class ResourceAlerter:
     def check_wall(self):
         """See if daemon can/should broadcast high usage messages via 'wall'
 
-        :returns: nothing
-        :rtype: N/A
+        Does not return anything; directly changes run-time variable of
+        wall_critical and wall_warning.
         """
 
         if bool(self.which('wall')):
@@ -294,11 +297,7 @@ class ResourceAlerter:
             debug_logger.debug('Program "wall" not found')
 
     def cpu_check(self):
-        """Checks CPU usage, logs and/or broadcasts high usage
-
-        :return: nothing
-        :rtype: N/A
-        """
+        """Checks CPU usage, logs and/or broadcasts high usage"""
 
         info_logger.info('Determining if CPU usage check is needed')
 
@@ -376,7 +375,7 @@ class ResourceAlerter:
                              'significantly since last broadcast')
             if self.stable_cpu_ref is None:
                 stable = False
-                info_logger.info('CPU stability unknown: '
+                info_logger.info('No CPU stability reference: '
                                  'broadcasting enabled')
             elif override:
                 stable = False
@@ -435,11 +434,7 @@ class ResourceAlerter:
         debug_logger.debug('Reset last CPU check time')
 
     def pids_same_test(self):
-        """Determine how similar current PIDs are to last resource check
-
-        :return: nothing
-        :rtype: N/A
-        """
+        """Determine how similar current PIDs are to last resource check"""
 
         new_pid_list = self.non_kernel_pids(psutil.pids())
         info_logger.info('Comparing similarity in PID lists since last '
@@ -464,11 +459,7 @@ class ResourceAlerter:
                              'activate')
 
     def ram_check(self):
-        """Checks RAM usage, logs and/or broadcasts high usage
-
-        :return: nothing
-        :rtype: N/A
-        """
+        """Checks RAM usage, logs and/or broadcasts high usage"""
 
         info_logger.info('Determining if RAM usage check is needed')
 
@@ -544,7 +535,7 @@ class ResourceAlerter:
                              'significantly since last broadcast')
             if self.stable_ram_ref is None:
                 stable = False
-                info_logger.info('RAM stability unknown: '
+                info_logger.info('No RAM stability reference: '
                                  'broadcasting enabled')
             elif override:
                 stable = False
@@ -603,11 +594,7 @@ class ResourceAlerter:
         debug_logger.debug('Reset last RAM check time')
 
     def run(self):
-        """Main loop for daemon
-
-        :return: nothing
-        :rtype: N/A
-        """
+        """Main loop for daemon"""
 
         # See if OS has 'wall' command to broadcast resource usage
         self.check_wall()
@@ -628,11 +615,7 @@ class ResourceAlerter:
             time.sleep(self.sleep_time())
 
     def sleep_time(self):
-        """Calculate time until next resource check is required
-
-        :return: time for daemon to sleep
-        :rtype: float
-        """
+        """Calculate time until next resource check is required"""
 
         debug_logger.debug('Calculating time until next resource check')
         next_cpu_check = self.last_cpu_check + config_dict['cpu_check_delay']

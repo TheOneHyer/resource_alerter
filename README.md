@@ -1,12 +1,9 @@
 resource_alerter
 ================
 
-Version: 0.0.0rc6
+Version: 1.0.0
 
-resource_alerter has passed most bug tests and it's time for field testing!
-If you use resource_alerter, let me know if you have any problems.
-
-resource_alerter is package containing a simple to use scripts to run 
+resource_alerter is package containing a simple to use script to run 
 resource_alerted: a Python daemon for Unix-like systems that monitors
 system resource usage and alerts users to high usage.
 
@@ -61,7 +58,7 @@ whether or not a high usage broadcast needs to be made in Step 10.
 > 5. See if 'wall' is available for broadcasts
 > 7. Start infinite loop
 > 8. Calculate similarity to PID list of last resource check
-> 9. Reset last PID list w/ current one
+> 9. Replace last PID list w/ current one
 > 10. for RESOURCE in CPU, RAM:
 >   * Calculate time since RESOURCE override last active, activate if too 
 > long
@@ -120,7 +117,7 @@ below:
     
 * cpu_override_delay:
 
-    Minimum amount of time between CPU-usage override activates in seconds. 
+    Minimum amount of time between CPU-usage overrides in seconds. 
     Essentially, high CPU usage will trigger a broadcast roughly at least as 
     often as this value.
     
@@ -148,7 +145,8 @@ below:
     Minimum percent similarity permitted between current Process IDs and 
     Process IDs of last resource check (not broadcast). Anything percent 
     similarity below this value will allow the resource check to continue, 
-    anything above this value will skip the resource checks.
+    anything above this value will skip the resource checks unless
+    overrides are active.
    
 * ram_check_delay:
 
@@ -161,7 +159,7 @@ below:
     
 * ram_override_delay:
 
-    Minimum amount of time between RAM-usage override activates in seconds. 
+    Minimum amount of time between RAM-usage overrides in seconds. 
     Essentially, high RAM usage will trigger a broadcast roughly at least as 
     often as this value.
     
@@ -189,13 +187,13 @@ below:
 * While you cannot directly disable the various filters used in Step 10 to 
 limit unnecessary broadcasts, certain config settings will effectively 
 disable the filters:
-  * Disable PID similarity check: set min_pid_same to "0.0"
-  * Disable resource time delay: set [resource]_check_delay to "0.0" (this
-    causes resource_alerted to more or less continuously monitor and log 
-    [resource], not recommended)
-  * Disable resource stability check: set [resource]_stable_diff to "0.0"
-  * Disable all filters: set [resource]_override_delay to "0.0" (see point
-    2 for why this isn't recommended)
+>  * Disable PID similarity check: set min_pid_same to "0.0"
+>  * Disable resource time delay: set [resource]_check_delay to "0.0" (this
+>    causes resource_alerted to more or less continuously monitor and log 
+>    [resource], not recommended)
+>  * Disable resource stability check: set [resource]_stable_diff to "0.0"
+>  * Disable all filters: set [resource]_override_delay to "0.0" (see point
+>    2 for why this isn't recommended)
     
 * While you cannot directly disable checking a specific resource, you can  
 effectively disable a resource's broadcasts, by setting 
@@ -216,4 +214,4 @@ Unit File
 ---------
 
 An example unit file for use with systemd that should work on most systems
-is included in this package: [resource_alerterd](resource_alerterd).
+is included in this package: [resource_alerterd.service](resource_alerterd.service).

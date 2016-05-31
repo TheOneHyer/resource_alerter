@@ -1,11 +1,12 @@
 [Unit]
 Description=Resource Alerter
-After=syslog.target
+Documentation=https://github.com/TheOneHyer/resource_alerter
 
 [Service]
 Type=simple
 PIDFile=/var/run/resource_alerterd/resource_alerterd.pid
 ExecStart=/usr/bin/resource_alerterd.py --systemd
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
